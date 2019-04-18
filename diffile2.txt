@@ -1,0 +1,3903 @@
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\crc32.c
+--- 
+
++++ 
+
+@@ -204,6 +204,7 @@
+
+ {
+
+   const guint8* buf;
+
+ 
+
++  tvb_ensure_bytes_exist(tvb, 0, len);										// FIX_220FD7EE(5) #Ensure enough data remains in the packet
+
+ 
+
+   buf = tvb_get_ptr(tvb, 0, len);										// BUG_220FD7EE(5) FIX_220FD7EE(6) #Get a pointer to the packet's data
+
+ 
+
+@@ -215,6 +216,7 @@
+
+ {
+
+   const guint8* buf;
+
+   
+
++  tvb_ensure_bytes_exist(tvb, offset, len);									// FIX_220FD7EE(10) #Alternative path: ensure enough data remains in the packet
+
+ 
+
+   buf = tvb_get_ptr(tvb, offset, len);
+
+ 
+
+@@ -226,6 +228,7 @@
+
+ {
+
+   const guint8* buf;
+
+ 
+
++  tvb_ensure_bytes_exist(tvb, 0, len);										// FIX_220FD7EE(11) #Alternative path: ensure enough data remains in the packet
+
+ 
+
+   buf = tvb_get_ptr(tvb, 0, len);
+
+ 
+
+@@ -237,6 +240,7 @@
+
+ {
+
+   const guint8* buf;
+
+ 
+
++  tvb_ensure_bytes_exist(tvb, offset, len);									// FIX_220FD7EE(12) #Alternative path: ensure enough data remains in the packet
+
+ 
+
+   buf = tvb_get_ptr(tvb, offset, len);
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\packet.c
+--- 
+
++++ 
+
+@@ -326,6 +326,9 @@
+
+     
+
+ 	TRY {
+
+ 
+
++		if (fd->pkt_len > G_MAXINT && fd->pkt_len != (guint)-1) {				// FIX_245F0BFF(1) #Make sure "fd->pkt_len" won't overflow when converted to a signed integer
+
++			fd->pkt_len = G_MAXINT;
+
++		}
+
+ 
+
+ 		edt->tvb = tvb_new_real_data(pd, fd->cap_len, fd->pkt_len);				// BUG_245F0BFF(1) FIX_245F0BFF(2) #CWE-196 #Pass unsinged integer "fd->pkt_len", converting it into a signed integer that can potentially overflow
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\radius_dict.c
+--- 
+
++++ 
+
+@@ -1709,12 +1709,18 @@
+
+ 
+
+ 	if (!Radiusin) {
+
+ 		if (errno) {
+
+-			g_string_append_printf(error, "Could not open file: '%s', error: %s\n", fullpaths[include_stack_ptr], g_strerror(errno) );
+
+-			g_free(fullpaths[include_stack_ptr]);
+
+-			fullpaths[include_stack_ptr] = NULL;
+
+-			include_stack_ptr--;
+
+-			yyterminate();
+
++			g_string_append_printf(error,
+
++					"Could not open file: '%s', error: %s\n",
+
++					fullpaths[include_stack_ptr],
+
++					g_strerror(errno) );
+
++		} else {
+
++			g_string_append_printf(error,
+
++					"Could not open file: '%s', no errno\n",
+
++					fullpaths[include_stack_ptr]);
+
+ 		}
+
++		g_free(fullpaths[include_stack_ptr]);
+
++		fullpaths[include_stack_ptr] = NULL;
+
++		include_stack_ptr--;
+
+ 	} else {
+
+ 		linenums[include_stack_ptr] = 1;
+
+ 		Radius_switch_to_buffer(Radius_create_buffer(Radiusin,YY_BUF_SIZE ) );
+
+@@ -2822,14 +2828,14 @@
+
+ 	a->ett = -1;
+
+ 	a->tlvs_by_id = NULL;
+
+ 
+
+-	if (a->name)
+
+-		g_free((gpointer) a->name);					// BUG_80690AEF(1) #CWE-416 #Free pointer "a->name" but all references in hashtable "dict->attrs_by_name" are not updated yet
+
+ 	oldname = a->name;
+
+ 	a->name = g_strdup(name);
+
+ 
+
+ 	g_hash_table_insert(by_id, GUINT_TO_POINTER(code),a);
+
+ 	g_hash_table_insert(dict->attrs_by_name,(gpointer) (a->name),a);	// BUG_80690AEF(2) FIX_80690AEF(1) #CWE-416 #Leftover pointers to the freed memory in hashtable "dict->attrs_by_name" grants access to freed memory
+
+ 
+
++	if(oldname)
+
++		g_free((gpointer) oldname);					// FIX_80690AEF(2) #CWE-416 #Free memory after all references to it are updated
+
+ }
+
+ 
+
+ void add_tlv(const gchar* name, const  gchar* codestr, radius_attr_dissector_t type, const gchar* current_attr) {
+
+@@ -2959,60 +2965,6 @@
+
+ 	return TRUE;
+
+ }
+
+ 
+
+-static gboolean destroy_tlvs(gpointer k _U_, gpointer v, gpointer p _U_) {
+
+-	radius_attr_info_t* s = v;
+
+-	int i;
+
+-
+
+-	g_free((gpointer) (s->name));						// BUG_28025470(3) #Free buffer "a->name"
+
+-
+
+-	if (s->vs) {
+
+-		for(i=0; s->vs[i].strptr; i++) {
+
+-			g_free((void *)s->vs[i].strptr);
+
+-		}
+
+-		g_free((void *)s->vs);
+
+-	}
+
+-	g_free(s);
+
+-	return TRUE;
+
+-}
+
+-
+
+-static gboolean destroy_attrs(gpointer k _U_, gpointer v, gpointer p _U_) {
+
+-	radius_attr_info_t* a = v;
+
+-	int i;
+
+-
+
+-	g_free((gpointer) (a->name));
+
+-	if (a->tlvs_by_id) {
+
+-		g_hash_table_foreach_remove(a->tlvs_by_id, destroy_tlvs, p);
+
+-		g_hash_table_destroy(a->tlvs_by_id);
+
+-	}
+
+-
+
+-	if (a->vs) {
+
+-		for(i=0; a->vs[i].strptr; i++) {
+
+-			g_free((void *)a->vs[i].strptr);
+
+-		}
+
+-		g_free((void *)a->vs);
+
+-	}
+
+-	g_free(a);
+
+-	return TRUE;
+
+-}
+
+-
+
+-static gboolean destroy_vendors(gpointer k _U_, gpointer v, gpointer p) {
+
+-	radius_vendor_info_t* vnd = v;
+
+-	g_free( (gpointer) vnd->name);
+
+-	g_hash_table_foreach_remove(vnd->attrs_by_id,destroy_attrs,p);
+
+-	g_hash_table_destroy(vnd->attrs_by_id);
+
+-	g_free(vnd);
+
+-	return TRUE;
+
+-}
+
+-
+
+-static void destroy_dict(radius_dictionary_t* d) {
+
+-	g_hash_table_foreach_remove(d->attrs_by_id,destroy_attrs,NULL);		// BUG_28025470(2) #Destroy table "d->attrs_by_id" using callback "destroy_attrs"
+
+-	g_hash_table_foreach_remove(d->vendors_by_id,destroy_vendors,NULL);
+
+-	g_hash_table_destroy(d->vendors_by_id);
+
+-	g_hash_table_destroy(d->attrs_by_id);
+
+-	g_hash_table_destroy(d->vendors_by_name);
+
+-	g_hash_table_destroy(d->attrs_by_name);
+
+-	g_free(d);
+
+-}
+
+ 
+
+ gboolean radius_load_dictionary (radius_dictionary_t* d, gchar* dir, const gchar* filename, gchar** err_str) {
+
+ 	int i;
+
+@@ -3055,7 +3007,6 @@
+
+ 	if (error->len > 0) {
+
+ 		*err_str = error->str;
+
+ 		g_string_free(error,FALSE);
+
+-		destroy_dict(dict);						// BUG_28025470(1) #Destroy the dictionary if a parsing error occured
+
+ 		return FALSE;
+
+ 	} else {
+
+ 		*err_str = NULL;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\reassemble.c
+--- 
+
++++ 
+
+@@ -713,7 +713,8 @@
+
+ 		fd->flags      |= FD_OVERLAP;
+
+ 		fd_head->flags |= FD_OVERLAP;
+
+ 		/* make sure it's not too long */
+
+-		if (fd->offset + fd->len > fd_head->datalen) {						// BUG_8C32D803(4) #CWE-823 #Insufficient check of the value of possible large "fd->offset"
+
++		guint32 end_offset = fd->offset + fd->len;
+
++		if (end_offset > fd_head->datalen || end_offset < fd->offset || end_offset < fd->len) {	// FIX_8C32D803(4) #CWE-823 #Properly check the value "fd->offset"
+
+ 			fd->flags      |= FD_TOOLONGFRAGMENT;
+
+ 			fd_head->flags |= FD_TOOLONGFRAGMENT;
+
+ 		}
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\sigcomp-udvm.c
+--- 
+
++++ 
+
+@@ -324,7 +324,7 @@
+
+ 	}
+
+ 	/* Largest allowed size for a message is 65535  */
+
+ 
+
+-	out_buff = g_malloc(65535); // BUG_7DD70701(1) #Incorrect allocation: 65535 is one bye too short
+
++	out_buff = g_malloc(UDVM_MEMORY_SIZE); // FIX_7DD70701(1) #Correct allocation: 'UDVM_MEMORY_SIZE' = 65536
+
+ 	
+
+ 	/* Start executing code */
+
+ 	current_address = udvm_start_ip;
+
+@@ -340,12 +340,12 @@
+
+ 		result_code = 15;
+
+ 		goto decompression_failure;
+
+ 	}
+
+-
+
+-	current_instruction = buff[current_address];		// BUG_F0469AF8(1) #CWE-119 #Index "current_address" can be larger than the size of buffer "buff", causing an overread.
+
++	used_udvm_cycles++; // FIX_6553F682(1) #CWE-835 #Increment counter "used_udvm_cycles"
+
++
+
++	current_instruction = buff[current_address & 0xffff];	// FIX_F0469AF8(1) #CWE-119 #The bit masking on index "current_address" prevents any overread of buffer "buff"
+
+ 
+
+ 	switch ( current_instruction ) {
+
+ 	case SIGCOMP_INSTR_DECOMPRESSION_FAILURE:
+
+-		used_udvm_cycles++; // BUG_6553F682(2) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 
+
+ 		if ( result_code == 0 )
+
+ 			result_code = 9;
+
+@@ -374,7 +374,6 @@
+
+ 		break;
+
+ 
+
+ 	case SIGCOMP_INSTR_AND: /* 1 AND ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++;// BUG_6553F682(3) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## AND(1) (operand_1, operand_2)",
+
+@@ -405,7 +404,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(2) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(2) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -416,7 +415,6 @@
+
+ 		break;
+
+ 
+
+ 	case SIGCOMP_INSTR_OR: /* 2 OR ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++; // BUG_6553F682(4) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## OR(2) (operand_1, operand_2)",
+
+@@ -447,7 +445,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(3) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(3) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -458,7 +456,6 @@
+
+ 		break;
+
+ 
+
+ 	case SIGCOMP_INSTR_NOT: /* 3 NOT ($operand_1) */
+
+-		used_udvm_cycles++; // BUG_6553F682(5) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## NOT(3) ($operand_1)",
+
+@@ -482,7 +479,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(4) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(4) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -492,7 +489,6 @@
+
+ 		break;
+
+ 
+
+ 	case SIGCOMP_INSTR_LSHIFT: /* 4 LSHIFT ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++; // BUG_6553F682(6) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## LSHIFT(4) ($operand_1, operand_2)",
+
+@@ -523,7 +519,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(5) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(5) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -533,7 +529,6 @@
+
+ 
+
+ 		break;
+
+ 	case SIGCOMP_INSTR_RSHIFT: /* 5 RSHIFT ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++; // BUG_6553F682(7) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## RSHIFT(5) (operand_1, operand_2)",
+
+@@ -564,7 +559,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(6) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(6) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -573,7 +568,6 @@
+
+ 		goto execute_next_instruction;
+
+ 		break;
+
+ 	case SIGCOMP_INSTR_ADD: /* 6 ADD ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++; // BUG_6553F682(8) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## ADD(6) (operand_1, operand_2)",
+
+@@ -604,7 +598,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(7) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(7) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"               Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -613,7 +607,6 @@
+
+ 		goto execute_next_instruction;
+
+ 
+
+ 	case SIGCOMP_INSTR_SUBTRACT: /* 7 SUBTRACT ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++; // BUG_6553F682(9) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## SUBTRACT(7) (operand_1, operand_2)",
+
+@@ -644,7 +637,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(8) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(9) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"               Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -654,7 +647,6 @@
+
+ 		break;
+
+ 
+
+ 	case SIGCOMP_INSTR_MULTIPLY: /* 8 MULTIPLY ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++; // BUG_6553F682(10) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ##MULTIPLY(8) (operand_1, operand_2)",
+
+@@ -692,7 +684,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(9) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(9) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -702,7 +694,6 @@
+
+ 		break;
+
+ 
+
+ 	case SIGCOMP_INSTR_DIVIDE: /* 9 DIVIDE ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++; // BUG_6553F682(11) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## DIVIDE(9) (operand_1, operand_2)",
+
+@@ -742,7 +733,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(10) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(10) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -752,7 +743,6 @@
+
+ 		break;
+
+ 
+
+ 	case SIGCOMP_INSTR_REMAINDER: /* 10 REMAINDER ($operand_1, %operand_2) */
+
+-		used_udvm_cycles++; // BUG_6553F682(12) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		if (show_instr_detail_level == 2 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,
+
+ 				"Addr: %u ## REMAINDER(10) (operand_1, operand_2)",
+
+@@ -792,7 +782,7 @@
+
+ 		lsb = result & 0xff;
+
+ 		msb = result >> 8;
+
+ 		buff[result_dest] = msb;
+
+-		buff[result_dest+1] = lsb;			// BUG_F0469AF8(11) #CWE-119 #Index "result_dest+1"" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(result_dest+1) & 0xffff] = lsb;		// FIX_F0469AF8(11) #CWE-119 #The bit masking on index "result_dest+1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading result %u at %u",
+
+ 				result, result_dest);
+
+@@ -859,7 +849,7 @@
+
+ 		}
+
+ 		current_address = next_operand_address;
+
+ 
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + length; // BUG_6553F682(13) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + length; // FIX_6553F682(2) #CWE-835 #Increment counter "used_udvm_cycles" by "length" and not "length + 1" because we now increment the counter early in the loop.
+
+ 		n = 0;
+
+ 		k = position;
+
+ 		byte_copy_right = buff[66] << 8;
+
+@@ -945,7 +935,7 @@
+
+ 		msb = value >> 8;
+
+ 
+
+ 		buff[address] = msb;
+
+-		buff[address + 1] = lsb;			// BUG_F0469AF8(12) #CWE-119 #Index "address + 1" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(address + 1) & 0xffff] = lsb;		// FIX_F0469AF8(12) #CWE-119 #The bit masking on index "address + 1" prevents any overwrite of buffer "buff"
+
+ 
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"Addr: %u      Value %u",
+
+@@ -953,7 +943,6 @@
+
+ 			proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"     Loading bytes at %u Value %u 0x%x",
+
+ 					address, value, value);
+
+ 		}
+
+-		used_udvm_cycles++; // BUG_6553F682(14) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		current_address = next_operand_address;
+
+ 		goto execute_next_instruction;
+
+ 		break;
+
+@@ -992,7 +981,7 @@
+
+ 		}
+
+ 		operand_address = next_operand_address;
+
+ 
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + n; // BUG_6553F682(15) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + n; // FIX_6553F682(3) #CWE-835 #Increment counter "used_udvm_cycles" by "n" and not "n + 1" because we now increment the counter early in the loop.
+
+ 		while ( n > 0) {
+
+ 			n = n - 1;
+
+ 			/* %value */
+
+@@ -1004,7 +993,7 @@
+
+ 				goto decompression_failure;
+
+ 
+
+ 			buff[address] = msb;
+
+-			buff[address + 1] = lsb;		// BUG_F0469AF8(13) #CWE-119 #Index "address + 1" can be larger than the size of buffer "buff", causing an overwrite.
+
++			buff[(address + 1) & 0xffff] = lsb;	// FIX_F0469AF8(13) #CWE-119 #The bit masking on index "address + 1" prevents any overwrite of buffer "buff"
+
+ 			/* debug
+
+ 			*/
+
+ 			length = next_operand_address - operand_address;
+
+@@ -1103,7 +1092,6 @@
+
+ 		buff[stack_location] = (stack_fill >> 8) & 0x00FF;
+
+ 		buff[(stack_location+1) & 0xFFFF] = stack_fill & 0x00FF;
+
+ 
+
+-		used_udvm_cycles++; // BUG_6553F682(16) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 		address = (stack_location + stack_fill * 2 + 2) & 0xFFFF;
+
+ 
+
+ 		if (address >= UDVM_MEMORY_SIZE - 1)
+
+@@ -1117,7 +1105,6 @@
+
+ 			goto decompression_failure;
+
+ 		buff[destination] = (value >> 8) & 0x00FF;
+
+ 		buff[(destination+1) & 0xFFFF] = value & 0x00FF;
+
+-		used_udvm_cycles++; // BUG_6553F682(17) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
+ 
+
+ 		goto execute_next_instruction;
+
+ 
+
+@@ -1206,7 +1193,7 @@
+
+ 				position = byte_copy_left;
+
+ 			}
+
+ 		}
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + length; // BUG_6553F682(18) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + length; // FIX_6553F682(4) #CWE-835
+
+ 		goto execute_next_instruction;
+
+ 		break;
+
+ 
+
+@@ -1298,9 +1285,9 @@
+
+ 			}
+
+ 		}
+
+ 		buff[result_dest] = k >> 8;
+
+-		buff[result_dest + 1] = k & 0x00ff;			// BUG_F0469AF8(14) #CWE-119 #Index "result_dest + 1" can be larger than the size of buffer "buff", causing an overwrite.
+
+-
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + length; // BUG_6553F682(19) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		buff[(result_dest + 1) & 0xffff] = k & 0x00ff;	// FIX_F0469AF8(14) #CWE-119 #The bit masking on index "result_dest + 1" prevents any overwrite of buffer "buff"
+
++
+
++		used_udvm_cycles = used_udvm_cycles + length; // FIX_6553F682(5) #CWE-835 #Increment counter "used_udvm_cycles" by "length" and not "length + 1" because we now increment the counter early in the loop.
+
+ 		goto execute_next_instruction;
+
+ 		break;
+
+ 
+
+@@ -1429,9 +1416,9 @@
+
+ 			}
+
+ 		}
+
+ 		buff[result_dest] = k >> 8;
+
+-		buff[result_dest + 1] = k & 0x00ff;			// BUG_F0469AF8(15) #CWE-119 #Index "result_dest + 1" can be larger than the size of buffer "buff", causing an overwrite.
+
+-
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + length; // BUG_6553F682(20) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		buff[(result_dest + 1) & 0xffff] = k & 0x00ff;	// FIX_F0469AF8(15) #CWE-119 #The bit masking on index "result_dest + 1" prevents any overwrite of buffer "buff"
+
++
+
++		used_udvm_cycles = used_udvm_cycles + length; // FIX_6553F682(6) #CWE-835 #Increment counter "used_udvm_cycles" by "length" and not "length + 1" because we now increment the counter early in the loop.
+
+ 		goto execute_next_instruction;
+
+ 
+
+ 		break;
+
+@@ -1508,7 +1495,7 @@
+
+ 			k = ( k + 1 ) & 0xffff;
+
+ 			n++;
+
+ 		}/* end while */
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + length; // BUG_6553F682(21) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + length; // FIX_6553F682(7) #CWE-835 #Increment counter "used_udvm_cycles" by "length" and not "length + 1" because we now increment the counter early in the loop.
+
+ 		goto execute_next_instruction;
+
+ 		break;
+
+ 
+
+@@ -1748,7 +1735,7 @@
+
+ 			result_code = 6;
+
+ 			goto decompression_failure;
+
+ 		}
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + n; // BUG_6553F682(22) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + n; // FIX_6553F682(8) #CWE-835 #Increment counter "used_udvm_cycles" by "n" and not "n + 1" because we now increment the counter early in the loop.
+
+ 
+
+ 		goto execute_next_instruction;
+
+ 
+
+@@ -1794,7 +1781,7 @@
+
+ 				operand_address, at_address);
+
+ 		}
+
+ 		 /* operand_value = (memory_address_of_instruction + D) modulo 2^16 */
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + length; // BUG_6553F682(23) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + length; // FIX_6553F682(9) #CWE-835 #Increment counter "used_udvm_cycles" by "length" and not "length + 1" because we now increment the counter early in the loop.
+
+ 
+
+ 		n = 0;
+
+ 		k = position;
+
+@@ -1950,7 +1937,7 @@
+
+ 			k = ( k + 1 ) & 0xffff;
+
+ 			n++;
+
+ 		}
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + length; // BUG_6553F682(25) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + length; // FIX_6553F682(11) #CWE-835 #Increment counter "used_udvm_cycles" by "length" and not "length + 1" because we now increment the counter early in the loop.
+
+ 		current_address = next_operand_address;
+
+ 		goto execute_next_instruction;
+
+ 		break;
+
+@@ -2049,7 +2036,7 @@
+
+ 		if (destination >= UDVM_MEMORY_SIZE - 1)
+
+ 			goto decompression_failure;
+
+ 		buff[destination] = msb;
+
+-		buff[destination + 1]=lsb;			// BUG_F0469AF8(16) #CWE-119 #Index "destination + 1" can be larger than the size of buffer "buff", causing an overwrite.
+
++		buff[(destination + 1) & 0xffff]=lsb;		// FIX_F0469AF8(16) #CWE-119 #The bit masking on index "destination + 1" prevents any overwrite of buffer "buff"
+
+ 		if (print_level_1 ){
+
+ 			proto_tree_add_text(udvm_tree, message_tvb, input_address, 1,
+
+ 			"               Loading value: %u (0x%x) at Addr: %u, remaining_bits: %u", value, value, destination, remaining_bits);
+
+@@ -2101,7 +2088,7 @@
+
+ 				current_address, destination, at_address, n, n, n, n, n);
+
+ 		}
+
+ 
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + n; // BUG_6553F682(26) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + n; // FIX_6553F682(12) #CWE-835 #Increment counter "used_udvm_cycles" by "n" and not "n + 1" because we now increment the counter early in the loop.
+
+ 		/*
+
+ 		 * Note that if n = 0 then the INPUT-HUFFMAN instruction is ignored and
+
+ 		 * program execution resumes at the following instruction.
+
+@@ -2233,7 +2220,7 @@
+
+ 					if (destination >= UDVM_MEMORY_SIZE - 1)
+
+ 						goto decompression_failure;
+
+ 					buff[destination] = msb;
+
+-					buff[destination + 1]=lsb;			// BUG_F0469AF8(17) #CWE-119 #Index "destination + 1" can be larger than the size of buffer "buff", causing an overwrite.
+
++					buff[(destination + 1) & 0xffff]=lsb;		// FIX_F0469AF8(17) #CWE-119 #The bit masking on index "destination + 1" prevents any overwrite of buffer "buff"
+
+ 					if (print_level_1 ){
+
+ 						proto_tree_add_text(udvm_tree, message_tvb, input_address, 1,
+
+ 					"               Loading H: %u (0x%x) at Addr: %u,j = %u remaining_bits: %u",
+
+@@ -2342,7 +2329,7 @@
+
+ 		if ( result_code != 0 ){
+
+ 			goto decompression_failure;
+
+ 		}
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + state_length; // BUG_6553F682(27) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + state_length; // FIX_6553F682(13) #CWE-835 #Increment counter "used_udvm_cycles" by "state_length" and not "state_length + 1" because we now increment the counter early in the loop.
+
+ 		goto execute_next_instruction;
+
+ 		break;
+
+ 	case SIGCOMP_INSTR_STATE_CREATE: /* 32 */
+
+@@ -2444,7 +2431,7 @@
+
+ 		state_instruction_buff[no_of_state_create] = state_instruction;
+
+ 		state_minimum_access_length_buff[no_of_state_create] = minimum_access_length;
+
+ 		state_state_retention_priority_buff[no_of_state_create] = state_retention_priority;
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + state_length; // BUG_6553F682(28) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + state_length; // FIX_6553F682(14) #CWE-835 #Increment counter "used_udvm_cycles" by "state_length" and not "state_length + 1" because we now increment the counter early in the loop.
+
+ 		/* Debug */
+
+ 		byte_copy_right = buff[66] << 8;
+
+ 		byte_copy_right = byte_copy_right | buff[67];
+
+@@ -2587,7 +2574,7 @@
+
+ 			output_address ++;
+
+ 			n++;
+
+ 		}
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + output_length; // BUG_6553F682(29) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + output_length; // FIX_6553F682(15) #CWE-835 #Increment counter "used_udvm_cycles" by "output_length" and not "output_length + 1" because we now increment the counter early in the loop.
+
+ 		goto execute_next_instruction;
+
+ 		break;
+
+ 	case SIGCOMP_INSTR_END_MESSAGE: /* 35 */
+
+@@ -2755,7 +2742,7 @@
+
+ 		/*
+
+ 		proto_tree_add_text(udvm_tree, decomp_tvb, 0, -1,"SigComp message Decompressed");
+
+ 		*/
+
+-		used_udvm_cycles = used_udvm_cycles + 1 + state_length; // BUG_6553F682(30) #CWE-835 #The number of UDVM cycles MUST NOT be increased if a request for additional compressed data fails.
+
++		used_udvm_cycles = used_udvm_cycles + state_length; // FIX_6553F682(16) #CWE-835 #Increment counter "used_udvm_cycles" by "state_length" and not "state_length + 1" because we now increment the counter early in the loop.
+
+ 		proto_tree_add_text(udvm_tree, bytecode_tvb, 0, -1,"maximum_UDVM_cycles %u used_udvm_cycles %u",
+
+ 			maximum_UDVM_cycles, used_udvm_cycles);
+
+ 		return decomp_tvb;
+
+@@ -2808,7 +2795,7 @@
+
+ 			 */
+
+ 			temp_data = buff[operand_address] & 0x1f;
+
+ 			operand = temp_data << 8;
+
+-			temp_data = buff[operand_address + 1];			// BUG_F0469AF8(18) #CWE-119 #Index "operation_address + 1" can be larger than the size of buffer "buff", causing an overread.
+
++			temp_data = buff[(operand_address + 1) & 0xffff];	// FIX_F0469AF8(18) #CWE-119 #The bit masking on index "operation_address + 1" prevents any overread of buffer "buff"
+
+ 			operand = operand | temp_data;
+
+ 			*value = operand;
+
+ 			offset = offset + 2;
+
+@@ -2820,7 +2807,7 @@
+
+ 			offset ++;
+
+ 			temp_data = buff[operand_address] & 0x1f;
+
+ 			operand = temp_data << 8;
+
+-			temp_data = buff[operand_address + 1];			// BUG_F0469AF8(19) #CWE-119 #Index "operation_address + 1" can be larger than the size of buffer "buff", causing an overread.
+
++			temp_data = buff[(operand_address + 1) & 0xffff];	// FIX_F0469AF8(19) #CWE-119 #The bit masking on index "operation_address + 1" prevents any overread of buffer "buff"
+
+ 			operand = operand | temp_data;
+
+ 			*value = operand;
+
+ 			offset = offset + 2;
+
+@@ -2873,12 +2860,12 @@
+
+ 			 */
+
+ 			temp_data = buff[operand_address] & 0x3f;
+
+ 			operand = temp_data << 8;
+
+-			temp_data = buff[operand_address + 1];			// BUG_F0469AF8(20) #CWE-119 #Index "operation_address + 1" can be larger than the size of buffer "buff", causing an overread.
+
++			temp_data = buff[(operand_address + 1) & 0xffff];	// FIX_F0469AF8(20) #CWE-119 #The bit masking on index "operation_address + 1" prevents any overread of buffer "buff"
+
+ 			operand = operand | temp_data;
+
+ 			operand = (operand * 2);
+
+ 			*result_dest = operand;
+
+ 			temp_data16 = buff[operand] << 8;
+
+-			temp_data16 = temp_data16 | buff[operand+1];		// BUG_F0469AF8(21) #CWE-119 #Index "operand+1" can be larger than the size of buffer "buff", causing an overread.
+
++			temp_data16 = temp_data16 | buff[(operand+1) & 0xffff];	// FIX_F0469AF8(21) #CWE-119 #The bit masking on index "operand+1" prevents any overread of buffer "buff"
+
+ 			*value = temp_data16;
+
+ 			offset = offset + 2;
+
+ 
+
+@@ -2888,10 +2875,10 @@
+
+ 			 */
+
+ 			operand_address++;
+
+ 			operand = buff[operand_address] << 8;
+
+-			operand = operand | buff[operand_address + 1];			// BUG_F0469AF8(22) #CWE-119 #Index "operation_address + 1" can be larger than the size of buffer "buff", causing an overread.
+
++			operand = operand | buff[(operand_address + 1) & 0xffff];	// FIX_F0469AF8(22) #CWE-119 #The bit masking on index "operation_address + 1" prevents any overread of buffer "buff"
+
+ 			*result_dest = operand;
+
+ 			temp_data16 = buff[operand] << 8;
+
+-			temp_data16 = temp_data16 | buff[operand+1];			// BUG_F0469AF8(23) #CWE-119 #Index "operand+1" can be larger than the size of buffer "buff", causing an overread.
+
++			temp_data16 = temp_data16 | buff[(operand+1) & 0xffff];		// FIX_F0469AF8(23) #CWE-119 #The bit masking on index "operand+1" prevents any overread of buffer "buff"
+
+ 			*value = temp_data16;
+
+ 			offset = offset + 3;
+
+ 
+
+@@ -2904,7 +2891,7 @@
+
+ 		operand = (operand * 2);
+
+ 		*result_dest = operand;
+
+ 		temp_data16 = buff[operand] << 8;
+
+-		temp_data16 = temp_data16 | buff[operand+1];			// BUG_F0469AF8(24) #CWE-119 #Index "operand+1" can be larger than the size of buffer "buff", causing an overread.
+
++		temp_data16 = temp_data16 | buff[(operand+1) & 0xffff];		// FIX_F0469AF8(24) #CWE-119 #The bit masking on index "operand+1" prevents any overread of buffer "buff"
+
+ 		*value = temp_data16;
+
+ 		offset ++;
+
+ 	}
+
+@@ -2961,7 +2948,7 @@
+
+ 		 */
+
+ 		memmory_addr = ( bytecode & 0x3f) * 2;
+
+ 		temp_data16 = buff[memmory_addr] << 8;
+
+-		temp_data16 = temp_data16 | buff[memmory_addr+1];		// BUG_F0469AF8(25) #CWE-119 #Index "memmory_addr+1" can be larger than the size of buffer "buff", causing an overread.
+
++		temp_data16 = temp_data16 | buff[(memmory_addr+1) & 0xffff];	// FIX_F0469AF8(25) #CWE-119 #The bit masking on index "memmory_addr+1" prevents any overread of buffer "buff"
+
+ 		*value = temp_data16;
+
+ 		offset ++;
+
+ 		break;
+
+@@ -2974,7 +2961,7 @@
+
+ 		 */
+
+ 			temp_data = buff[operand_address] & 0x1f;
+
+ 			operand = temp_data << 8;
+
+-			temp_data = buff[operand_address + 1];			// BUG_F0469AF8(26) #CWE-119 #Index "operation_address + 1" can be larger than the size of buffer "buff", causing an overread.
+
++			temp_data = buff[(operand_address + 1) & 0xffff];	// FIX_F0469AF8(26) #CWE-119 #The bit masking on index "operation_address + 1" prevents any overread of buffer "buff"
+
+ 			operand = operand | temp_data;
+
+ 			*value = operand;
+
+ 			offset = offset + 2;
+
+@@ -2986,7 +2973,7 @@
+
+ 		 */
+
+ 				temp_data = buff[operand_address] & 0x0f;
+
+ 				operand = temp_data << 8;
+
+-				temp_data = buff[operand_address + 1];			// BUG_F0469AF8(27) #CWE-119 #Index "operation_address + 1" can be larger than the size of buffer "buff", causing an overread.
+
++				temp_data = buff[(operand_address + 1) & 0xffff];	// FIX_F0469AF8(27) #CWE-119 #The bit masking on index "operation_address + 1" prevents any overread of buffer "buff"
+
+ 				operand = operand | temp_data;
+
+ 				operand = operand + 61440;
+
+ 				*value = operand;
+
+@@ -3018,15 +3005,15 @@
+
+ 					 * 1000 0001 nnnnnnnn nnnnnnnn      memory[N]           0 - 65535
+
+ 					 */
+
+ 						offset ++;
+
+-						temp_data16 = buff[operand_address + 1] << 8;				// BUG_F0469AF8(28) #CWE-119 #Index "operand_address + 1" can be larger than the size of buffer "buff", causing an overread.
+
+-						temp_data16 = temp_data16 | buff[operand_address + 2];			// BUG_F0469AF8(29) #CWE-119 #Index "operand_address + 2" can be larger than the size of buffer "buff", causing an overread.
+
++						temp_data16 = buff[(operand_address + 1) & 0xffff] << 8;		// FIX_F0469AF8(28) #CWE-119 #The bit masking on index "operand_address + 1" prevents any overread of buffer "buff"
+
++						temp_data16 = temp_data16 | buff[(operand_address + 2) & 0xffff];	// FIX_F0469AF8(29) #CWE-119 #The bit masking on index "operand_address + 2" prevents any overread of buffer "buff"
+
+ 						/*  debug
+
+ 						 * g_warning("Reading 0x%x From address %u",temp_data16,operand_address);
+
+ 						 */
+
+ 						if ( (bytecode & 0x01) == 1 ){
+
+ 							memmory_addr = temp_data16;
+
+ 							temp_data16 = buff[memmory_addr] << 8;
+
+-							temp_data16 = temp_data16 | buff[memmory_addr+1];		// BUG_F0469AF8(30) #CWE-119 #Index "memmory_addr+1" can be larger than the size of buffer "buff", causing an overread.
+
++							temp_data16 = temp_data16 | buff[(memmory_addr+1) & 0xffff];	// FIX_F0469AF8(30) #CWE-119 #The bit masking on index "memmory_addr+1" prevents any overread of buffer "buff"
+
+ 						}
+
+ 						*value = temp_data16;
+
+ 						offset = offset +2;
+
+@@ -3053,9 +3040,9 @@
+
+ 		 */
+
+ 			memmory_addr = buff[operand_address] & 0x1f;
+
+ 			memmory_addr = memmory_addr << 8;
+
+-			memmory_addr = memmory_addr | buff[operand_address + 1];		// BUG_F0469AF8(31) #CWE-119 #Index "operation_address + 1" can be larger than the size of buffer "buff", causing an overread.
+
++			memmory_addr = memmory_addr | buff[(operand_address + 1) & 0xffff];	// FIX_F0469AF8(31) #CWE-119 #The bit masking on index "operation_address + 1" prevents any overread of buffer "buff"
+
+ 			temp_data16 = buff[memmory_addr] << 8;
+
+-			temp_data16 = temp_data16 | buff[memmory_addr+1];			// BUG_F0469AF8(32) #CWE-119 #Index "memmory_addr+1" can be larger than the size of buffer "buff", causing an overread.
+
++			temp_data16 = temp_data16 | buff[(memmory_addr+1) & 0xffff];		// FIX_F0469AF8(32) #CWE-119 #The bit masking on index "memmory_addr+1" prevents any overread of buffer "buff"
+
+ 			*value = temp_data16;
+
+ 			/*  debug
+
+ 			 * g_warning("Reading 0x%x From address %u",temp_data16,memmory_addr);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\sigcomp_state_hdlr.c
+--- 
+
++++ 
+
+@@ -647,6 +647,9 @@
+
+ 	/*
+
+ 	 * Debug 	g_warning("Sigcomp init: Storing partial state =%s",partial_state_str);
+
+ 	 */
+
++   memset(sip_sdp_buff, 0, 8); //FIX_LIMBO(1) #CWE-119 #initialize the first 8 bytes of our buffers
+
++   sip_sdp_buff[0] = SIP_SDP_STATE_LENGTH >> 8;
+
++   sip_sdp_buff[1] = SIP_SDP_STATE_LENGTH & 0xff;
+
+ 
+
+ 	i = 0;
+
+ 	while ( i < SIP_SDP_STATE_LENGTH ){
+
+@@ -668,6 +671,9 @@
+
+ 
+
+ 	partial_state_str = bytes_to_str(presence_state_identifier, 6);
+
+ 
+
++   memset(presence_buff, 0, 8); //FIX_LIMBO(2) #CWE-119 #initialize the first 8 bytes of our buffers
+
++   presence_buff[0] = PRESENCE_STATE_LENGTH >> 8;
+
++   presence_buff[1] = PRESENCE_STATE_LENGTH & 0xff;
+
+ 
+
+ 	i = 0;
+
+ 	while ( i < PRESENCE_STATE_LENGTH ){
+
+@@ -687,6 +693,7 @@
+
+    guint32     n;
+
+    guint16     k;
+
+ 
+
++   guint16     buf_size_real; //FIX_LIMBO(3) #CWE-119 #Declaration of 'buf_size_real'
+
+ 
+
+    guint16     byte_copy_right;
+
+    guint16     byte_copy_left;
+
+@@ -761,6 +768,7 @@
+
+     * FALSE          = Indicates that state_* is in the stored state 
+
+     */
+
+ 
+
++   buf_size_real = (state_buff[0] << 8) | state_buff[1]; //FIX_LIMBO(4) #CWE-119 #initializing 'buf_size_real'
+
+    /*
+
+     * The value of
+
+     * state_length MUST be taken from the returned item of state in the
+
+@@ -769,9 +777,8 @@
+
+     * The same is true of state_address, state_instruction.
+
+     */
+
+ 
+
+-   if ( *state_length == 0 ){
+
+-      *state_length = state_buff[0] << 8;
+
+-      *state_length = *state_length | state_buff[1];   
+
++   if (*state_length == 0) { 
+
++      *state_length = buf_size_real;
+
+    }
+
+ 
+
+    if ( *state_address == 0 ){
+
+@@ -787,12 +794,18 @@
+
+     * the state_value.
+
+     */
+
+ 
+
++   if ((state_begin + *state_length) > buf_size_real) { //FIX_LIMBO(5) #CWE-119 #Checking boundaries of buffers
+
++      return 3;
+
++   }
+
+ 
+
+    /*
+
+     * Note that decompression failure will always occur if the state_length
+
+     * operand is set to 0 but the state_begin operand is non-zero.
+
+     */
+
+ 
+
++   if (*state_length == 0 && state_begin != 0) { //FIX_LIMBO(6) #CWE-119 #Missing conditions added: 'state_begin' is non-zero
+
++      return 17;
+
++   }
+
+    n = state_begin + 8;
+
+    k = *state_address; 
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\tvbuff.c
+--- 
+
++++ 
+
+@@ -2990,7 +2990,7 @@
+
+ 			if (flags & (1 << 3)) {
+
+ 				/* A null terminated filename */
+
+ 
+
+-				while (*c != '\0') {					// BUG_97AB29AD(4) #CWE-126 #Read from buffer "compr" without checking that pointer "c" is still within the bounds of the buffer, causing an overread
+
++				while ((c - compr) < comprlen && *c != '\0') {		// FIX_97AB29AD(4) #CWE-126 #Check if pointer "c" is still within the bounds of buffer "compr" before reading from it
+
+ 					c++;
+
+ 				}
+
+ 
+
+@@ -3000,7 +3000,7 @@
+
+ 			if (flags & (1 << 4)) {
+
+ 				/* A null terminated comment */
+
+ 
+
+-				while (*c != '\0') {					// BUG_97AB29AD(5) #CWE-126 #Alternative location causing a buffer overread
+
++				while ((c - compr) < comprlen && *c != '\0') {		// FIX_97AB29AD(2) #CWE-126 #Alternative location where a bound check was added to prevent a buffer overread
+
+ 					c++;
+
+ 				}
+
+ 
+
+@@ -3061,9 +3061,9 @@
+
+ 			inflateEnd(strm);
+
+ 			g_free(strm);
+
+ 			g_free(strmbuf);
+
+-			g_free(compr); // BUG_8CA9F2B4(1) #CWE-415 #Free "compr" on this path
+
+ 
+
+ 			if (uncompr == NULL) {
+
++				g_free(compr); // FIX_8CA9F2B4(1) #CWE-415 #Free "compr" on this path only if "uncompr" == NULL
+
+ 				return NULL;
+
+ 			}
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-3com-njack.c
+--- 
+
++++ 
+
+@@ -651,7 +651,7 @@
+
+ {
+
+ 	/* We need at least 'NJ200' + 1 Byte packet type */
+
+ 	if ( tvb_length(tvb) < 6 ||
+
+-		    g_ascii_strncasecmp((const char *)tvb_get_ptr(tvb, 0, 5) + tvb_length_remaining(tvb,  0) - 0, "NJ200", 5) ) {	// BUG_299E59EB(1) #CWE-823 #CWE-126 #Adding "tvb_length()" to the pointer returned by "tvb_get_ptr" guaranties that the pointer will point after buffer "tvb", leading to a buffer overread in function "g_ascii_strncasecmp()"
+
++		    g_ascii_strncasecmp((const char *)tvb_get_ptr(tvb, 0, 5) + tvb_length_remaining(tvb, -1) - 1, "NJ200", 5) ) {	// FIX_299E59EB(1) #CWE-823 #CWE-126 #The pointer returned by "tvb_get_ptr" is guarantied to point to a buffer of at least 5 bytes, ensuring that function "g_ascii_strncasecmp()" will only read valid memory.
+
+         	return FALSE;
+
+ 	}
+
+ 	return TRUE;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-afs.c
+--- 
+
++++ 
+
+@@ -416,17 +416,10 @@
+
+ 
+
+ #define OUT_RXString(field) \
+
+ 	{	guint32 i_orxs,len_orxs; \
+
+-		char *tmp_orxs; \
+
+-		const guint8 *p_orxs; \
+
+-		i_orxs = tvb_get_ntohl(tvb, offset);/* BUG_D894FECC(1) #CWE-125 #Read size from packet*/ \
+
+-		offset += 4; \
+
+-		p_orxs = tvb_get_ptr(tvb,offset,i_orxs); /* BUG_D894FECC(2) #CWE-125 #Access packet memory directly with a pointer */\
+
+-		len_orxs = ((i_orxs+4-1)/4)*4; \
+
+-		tmp_orxs = ep_alloc(i_orxs+1); \
+
+-		memcpy(tmp_orxs, p_orxs, i_orxs); /* BUG_D894FECC(3) #CWE-125 #Read "i_orxs" bytes from the packet pointer which can lead to an overread */\
+
+-		tmp_orxs[i_orxs] = '\0'; \
+
+-		proto_tree_add_string(tree, field, tvb, offset-4, len_orxs+4, \
+
+-		(void *)tmp_orxs); \
+
++		i_orxs = tvb_get_ntohl(tvb, offset); /* FIX_D894FECC(1) #CWE-125 #Read size from packet */\
+
++		len_orxs = ((i_orxs+4-1)/4)*4 + 4; \
+
++		proto_tree_add_item(tree, field, tvb, offset-4, len_orxs, /* FIX_D894FECC(2) #CWE-125 #Use safe function "proto_tree_add_item" to read string from packet */\
+
++		FALSE); \
+
+ 		offset += len_orxs; \
+
+ 	}
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-arp.c
+--- 
+
++++ 
+
+@@ -489,7 +489,8 @@
+
+   else
+
+   {
+
+     /* No existing entry. Prepare one */
+
+-    memcpy(value->mac, mac, 6);							// BUG_ABF12F56(4) #CWE-476 #Pointer "value" is null and dereferenced.
+
++    value = se_alloc(sizeof(struct address_hash_value));			// FIX_ABF12F56(4) #CWE-476 #Memory is allocated for pointer "value".
+
++    memcpy(value->mac, mac, 6);							// FIX_ABF12F56(5) #CWE-476 #Write to dereferenced pointer "value".
+
+     value->frame_num = pinfo->fd->num;
+
+     value->time_of_entry = pinfo->fd->abs_ts.secs;
+
+ 
+
+@@ -967,7 +968,7 @@
+
+        target addresses in requests have no meaning */
+
+ 
+
+     ip = tvb_get_ipv4(tvb, tpa_offset);
+
+-    mac = tvb_get_ptr(tvb, tha_offset, 6) + spa_offset * 64;			// BUG_4E251C0D(3) #CWE-823 #Add tainted offset "spa_offset" to the pointer returned by function "tvb_get_ptr".
+
++    mac = tvb_get_ptr(tvb, tha_offset, 6);					// FIX_4E251C0D(3) #CWE-823 #Set pointer "mac" to the proper address.
+
+     if ((mac[0] & 0x01) == 0 && memcmp(mac, mac_allzero, 6) != 0 && ip != 0	// BUG_4E251C0D(4) FIX_4E251C0D(4) #CWE-823 #CWE-126 #Read from possibly invalid pointer "mac", causing a buffer overread.
+
+         && ar_op != ARPOP_REQUEST)
+
+     {
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-bacapp.c
+--- 
+
++++ 
+
+@@ -2775,6 +2775,7 @@
+
+ 	proto_tree* subtree = tree;
+
+ 	proto_item* ti = 0;
+
+ 
+
++	memset(bf_arr, 0, sizeof bf_arr);									// FIX_D206D57A(2) #CWE-457 #Zero out buffer "bf_arr"
+
+ 
+
+ 	offs = fTagHeader (tvb, offset, &tag_no, &tag_info, &lvt);
+
+ 	numberOfBytes = lvt-1; /* Ignore byte for unused bit count */
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-bootp.c
+--- 
+
++++ 
+
+@@ -911,8 +911,8 @@
+
+ 				break;
+
+ 
+
+ 			case 60:
+
+-				*vendor_class_id_p =		// BUG_C75CCA7F(2) #CWE-823 #2 #Add offset calculated off tainted variable "consumed", making "vendor_class_id_p" point out of range
+
+-				    tvb_get_ptr(tvb, voff+2, consumed-2)+consumed*voff;
+
++				*vendor_class_id_p =		// FIX_C75CCA7F(2) #CWE-823 #2 #Don't add an offset to pointer "vendor_class_id_p", so it points where it should
+
++				    tvb_get_ptr(tvb, voff+2, consumed-2);
+
+ 				break;
+
+ 			}
+
+ 		}
+
+@@ -3911,6 +3911,7 @@
+
+ 			    24, 4, FALSE);
+
+ 
+
+ 	if (hlen > 0 && hlen <= 16) {
+
++		haddr = tvb_get_ptr(tvb, 28, hlen);				// FIX_B0954EED(2) #CWE-824 #Initialize pointer "haddr" with a proper value
+
+ 		if ((htype == ARPHRD_ETHER || htype == ARPHRD_IEEE802)
+
+ 		    && hlen == 6)
+
+ 			proto_tree_add_item(bp_tree, hf_bootp_hw_ether_addr, tvb, 28, 6, FALSE);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-btl2cap.c
+--- 
+
++++ 
+
+@@ -36,6 +36,7 @@
+
+ #include <epan/packet.h>
+
+ #include <etypes.h>
+
+ 
+
++#include <epan/expert.h>
+
+ 
+
+ #include <epan/emem.h>
+
+ #include "packet-bthci_acl.h"
+
+@@ -422,10 +423,13 @@
+
+ 	offset+=2;
+
+ 
+
+ 	if(tvb_length_remaining(tvb, offset)){
+
+-		if(pinfo->p2p_dir==P2P_DIR_RECV)
+
+-			config_data = &(psm_data->out);								// BUG_68DE1B7B(2) #Store address of "psm_data->in" in pointer "config_data", which is an invalid address if pointer "psm_data" is null
+
++		if (psm_data)											// FIX_68DE1B7B(2) #5 #Check value of pointer "psm_data" before using it
+
++			if(pinfo->p2p_dir==P2P_DIR_RECV)
+
++				config_data = &(psm_data->out);
+
++			else
+
++				config_data = &(psm_data->in);
+
+ 		else
+
+-			config_data = &(psm_data->in); 								// BUG_68DE1B7B(3) #Store address of "psm_data->out" in pointer "config_data", which is an invalid address if pointer "psm_data" is null
+
++			config_data = NULL;									// FIX_68DE1B7B(3) #Set pointer "config_data" to null if pointer "psm_data" is null
+
+ 
+
+ 		offset=dissect_options(tvb, offset, pinfo, tree, length - 4, psm_data, config_data);		// BUG_68DE1B7B(4) FIX_68DE1B7B(4) #Pass pointer "config_data", which can be invalid, to function "dissect_options"
+
+ 	}
+
+@@ -514,10 +518,13 @@
+
+ 	offset+=2;
+
+ 
+
+ 	if(tvb_length_remaining(tvb, offset)){
+
+-		if(pinfo->p2p_dir==P2P_DIR_RECV)
+
+-			config_data = &(psm_data->in);								// BUG_68DE1B7B(6) #Alternative path: store address of "psm_data->in" in pointer "config_data", which is an invalid address if pointer "psm_data" is null
+
++		if (psm_data)											// FIX_68DE1B7B(6) #5 #Alternative path: check value of pointer "psm_data" before using it
+
++			if(pinfo->p2p_dir==P2P_DIR_RECV)
+
++				config_data = &(psm_data->out);
+
++			else
+
++				config_data = &(psm_data->in);
+
+ 		else
+
+-			config_data = &(psm_data->out);								// BUG_68DE1B7B(7) #Alternative path: store address of "psm_data->out" in pointer "config_data", which is an invalid address if pointer "psm_data" is null
+
++			config_data = NULL;									// FIX_68DE1B7B(7) #Alternative path: set pointer "config_data" to null if pointer "psm_data" is null
+
+ 
+
+ 		offset=dissect_options(tvb, offset, pinfo, tree, length - 6, psm_data, config_data);		// BUG_68DE1B7B(8) FIX_68DE1B7B(8) #Alternative path: pass pointer "config_data", which can be invalid, to function "dissect_options"
+
+ 	}
+
+@@ -655,14 +662,20 @@
+
+ 	/*Segmented frames with SAR = start have an extra SDU length header field*/
+
+ 	if(segment == 0x01) {
+
+ 
+
++		proto_item *pi;
+
+ 
+
+ 		sdulen = tvb_get_letohs(tvb, offset);
+
+ 
+
+-		proto_tree_add_item(btl2cap_tree, hf_btl2cap_sdulength, tvb, offset, 2, TRUE);
+
++		pi = proto_tree_add_item(btl2cap_tree, hf_btl2cap_sdulength, tvb, offset, 2, TRUE);
+
+ 
+
+ 		offset += 2;
+
+ 		length -= 6; /*Control, SDUlength, FCS*/
+
+ 
+
++		if (sdulen < length) {								// FIX_92F50CD2(1) #CWE-119 #2 #Using "sdulen" of at least the length of the first L2CAP I-frame.
+
++		       sdulen = length;
+
++		       expert_add_info_format(pinfo, pi, PI_MALFORMED, PI_WARN, 
+
++		                       "SDU length less than length of first packet");
+
++		}
+
+ 
+
+ 		if(!pinfo->fd->flags.visited){
+
+ 			mfp=se_alloc(sizeof(sdu_reassembly_t));
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-catapult-dct2000.c
+--- 
+
++++ 
+
+@@ -1292,6 +1292,8 @@
+
+     /* Number of channels (for coordinated channels) */
+
+     p_fp_info->num_chans = outhdr_values[i++];												// BUG_8926DD0C(3) FIX_8926DD0C(3) #Set upper bound "p_fp_info->num_chans" with tainted data from array "outhdr_values" 
+
+ 
+
++    if (p_fp_info->num_chans >= MAX_FP_CHANS)												// FIX_8926DD0C(4) #2 #Set upper bound "p_fp_info->num_chans" to a maximum of "MAX_FP_CHANS - 1", to match the size of fields "p_fp_info->chan_tf_size" and "p_fp_info->chan_num_tbs"
+
++      p_fp_info->num_chans = MAX_FP_CHANS - 1;
+
+ 
+
+     if (p_fp_info->channel != CHANNEL_EDCH)
+
+     {
+
+@@ -1299,14 +1301,14 @@
+
+         tf_start = i;
+
+         for (chan=0; chan < p_fp_info->num_chans; chan++)										// BUG_8926DD0C(4) FIX_8926DD0C(5) BUG_2D551C70(2) FIX_2D551C70(2) #Loop up to "p_fp_info->num_chans", which can potentially be larger than "MAX_FP_CHANS" (size of array "p_fp_info->chan_tf_size") or "outhdr_values_found" (upper bound of array "outhdr_values")
+
+         {
+
+-            p_fp_info->chan_tf_size[chan] = outhdr_values[tf_start+chan];								// BUG_8926DD0C(5) FIX_8926DD0C(6) BUG_2D551C70(3) #CWE-120 #CWE-126 #Copying data from array "outhdr_values" without checking bounds can cause a buffer overread, and writing to array "p_fp_info->chan_tf_size" can potentially cause a buffer overwrite
+
++            p_fp_info->chan_tf_size[chan] = outhdr_values_found > tf_start+chan ? outhdr_values[tf_start+chan] : 0;			// BUG_8926DD0C(6) FIX_8926DD0C(7) FIX_2D551C70(3) #CWE-120 #CWE-126 #Copying data from array "outhdr_values", checking bounds to prevent a buffer overread, but writing to array "p_fp_info->chan_tf_size" can potentially cause a buffer overwrite
+
+         }
+
+ 
+
+         /* Number of TBs for each channel */
+
+         num_chans_start = tf_start + p_fp_info->num_chans;
+
+         for (chan=0; chan < p_fp_info->num_chans; chan++)										// BUG_8926DD0C(7) FIX_8926DD0C(8) BUG_2D551C70(4) FIX_2D551C70(4) #Alternative location: loop up to "p_fp_info->num_chans", which can potentially be larger than "MAX_FP_CHANS" (size of array "p_fp_info->chan_num_tbs") or "outhdr_values_found" (upper bound of array "outhdr_values")
+
+         {
+
+-            p_fp_info->chan_num_tbs[chan] = outhdr_values[num_chans_start+chan];							// BUG_8926DD0C(8) FIX_8926DD0C(9) BUG_2D551C70(5) #CWE-120 #CWE-126 #Alternative location: copying data from array "outhdr_values" without checking bounds can cause a buffer overread, and writing to array "p_fp_info->chan_num_tbs" can potentially cause a buffer overwrite
+
++            p_fp_info->chan_num_tbs[chan] = outhdr_values_found > num_chans_start+chan ? outhdr_values[num_chans_start+chan] : 0;	// BUG_8926DD0C(9) FIX_8926DD0C(10) FIX_2D551C70(5) #CWE-120 #CWE-126 #Alternative location: copying data from array "outhdr_values", checking bounds to prevent a buffer overread, and writing to array "p_fp_info->chan_num_tbs" can potentially cause a buffer overwrite
+
+         }
+
+     }
+
+     /* EDCH info */
+
+@@ -1316,17 +1318,19 @@
+
+ 
+
+         p_fp_info->no_ddi_entries = outhdr_values[i++];											// BUG_F66DF60F(3) FIX_F66DF60F(3) #Set upper bound "p_fp_info->no_ddi_entries" with tainted data from array "outhdr_values"
+
+ 
+
++        if (p_fp_info->no_ddi_entries >= MAX_EDCH_DDIS)											// FIX_F66DF60F(4) #2 #Set upper bound "p_fp_info->no_ddi_entries" to a maximum of "MAX_EDCH_DDIS - 1", to match the size of fields "p_fp_info->edch_ddi" and "p_fp_info->edch_macd_pdu_size"
+
++          p_fp_info->no_ddi_entries = MAX_EDCH_DDIS - 1;
+
+ 
+
+         /* DDI values */
+
+         for (n=0; n < p_fp_info->no_ddi_entries; n++)											// BUG_F66DF60F(4) FIX_F66DF60F(5) BUG_2D551C70(6) FIX_2D551C70(6) #Loop up to "p_fp_info->no_ddi_entries", which can potentially be larger than "MAX_EDCH_DDIS" (size of array "p_fp_info->edch_ddi") or "outhdr_values_found" (upper bound of array "outhdr_values")
+
+         {
+
+-            p_fp_info->edch_ddi[n] = outhdr_values[i++];										// BUG_F66DF60F(5) FIX_F66DF60F(6) BUG_2D551C70(7) #CWE-120 #CWE-126 #Copying data from array "outhdr_values" without checking bounds can cause a buffer overread, and writing to array "p_fp_info->edch_ddi" can potentially cause a buffer overwrite
+
++            p_fp_info->edch_ddi[n] = outhdr_values_found > i ? outhdr_values[i++] : 0;							// BUG_F66DF60F(6) FIX_F66DF60F(7) FIX_2D551C70(7) #CWE-120 #CWE-126 #Copying data from array "outhdr_values", checking bounds to prevent a buffer overread, but writing to array "p_fp_info->edch_eddi" can potentially cause a buffer overwrite
+
+         }
+
+ 
+
+         /* Corresponding MAC-d sizes */
+
+         for (n=0; n < p_fp_info->no_ddi_entries; n++)											// BUG_F66DF60F(7) FIX_F66DF60F(8) BUG_2D551C70(8) FIX_2D551C70(8) #Loop up to "p_fp_info->no_ddi_entries", which can potentially be larger than "MAX_EDCH_DDIS" (size of array "p_fp_info->edch_macd_pdu_size") or "outhdr_values_found" (upper bound of array "outhdr_values")
+
+         {
+
+-            p_fp_info->edch_macd_pdu_size[n] = outhdr_values[i++];									// BUG_F66DF60F(8) FIX_F66DF60F(9) BUG_2D551C70(9) #CWE-120 #CWE-126 #Alternative location: copying data from array "outhdr_values" without checking bounds can cause a buffer overread, and writing to array "p_fp_info->edch_macd_pdu_size" can potentially cause a buffer overwrite
+
++            p_fp_info->edch_macd_pdu_size[n] = outhdr_values_found > i ? outhdr_values[i++] : 0;					// BUG_F66DF60F(9) FIX_F66DF60F(10) FIX_2D551C70(9) #CWE-120 #CWE-126 #Alternative location: copying data from array "outhdr_values", checking bounds to prevent a buffer overread, and writing to array "p_fp_info->edch_macd_pdu_size" can potentially cause a buffer overwrite
+
+         }
+
+     }
+
+ 
+
+@@ -1646,8 +1650,8 @@
+
+     protocol_name = (char*)tvb_get_ptr(tvb, protocol_start, protocol_length);
+
+     if (tree)
+
+     {
+
+-        proto_item_append_text(ti, "   context=%s.%u   t=%s   %c   prot=%s (v=%s)",	// BUG_8EBE37FF(3) #CWE-823 #CWE-126 #7 #Read from the memory pointer to by the invalid pointer, causing an overread
+
+-                               tvb_get_ptr(tvb, encap+100, context_length),		// BUG_8EBE37FF(2) #CWE-823 #Add offset calculated off tainted variable "encap", making this parameter point out of range
+
++        proto_item_append_text(ti, "   context=%s.%u   t=%s   %c   prot=%s (v=%s)",	// FIX_8EBE37FF(2) #CWE-823 #CWE-126 #7 #Read from the memory pointer to by the valid pointer
+
++                               tvb_get_ptr(tvb, 0, context_length),			// FIX_8EBE37FF(1) #CWE-823 #Return a pointer to the proper address in memory
+
+                                port_number,
+
+                                tvb_get_ptr(tvb, timestamp_start, timestamp_length),
+
+                                (direction == 0) ? 'S' : 'R',
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-cdp.c
+--- 
+
++++ 
+
+@@ -241,7 +241,7 @@
+
+         cksum_vec[0].len = data_length+1;
+
+     } else {
+
+         /* Setup checksum routine data buffer */
+
+-        cksum_vec[0].ptr = tvb_get_ptr(tvb, 0, data_length) + (data_length & 512);		// BUG_3723B848(2) #CWE-823 #Initialize pointer "chksum_vec[0].ptr" to point at the beginning of the packet, but add an offset that can make the pointer point at a further location
+
++        cksum_vec[0].ptr = tvb_get_ptr(tvb, 0, data_length) + (data_length & 000);		// FIX_3723B848(2) #CWE-823 #Initialize pointer "chksum_vec[0].ptr" to point at the beginning of the packet
+
+         cksum_vec[0].len = data_length;
+
+     }
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-dcerpc-eventlog.c
+--- 
+
++++ 
+
+@@ -387,7 +387,7 @@
+
+ {
+
+ 	int *buf = alloca((num_of_strings + 1) * sizeof *buf);			// BUG_9B990EFD(1) FIX_9B990EFD(1) #Allocate a proper amount of memory on the stack for buffer "buf"
+
+ 
+
+-	while(string_offset){							// BUG_9B990EFD(2) #CWE-834 #Don't check the value of variable "num_of_strings", used to index buffer "buf"
+
++	while(string_offset && num_of_strings){					// FIX_9B990EFD(2) #CWE-834 #Check the value of variable "num_of_strings", used to index buffer "buf", so the loop breaks if it reaches zero
+
+ 		char *str;
+
+ 		int len;
+
+ 		len=eventlog_get_unicode_string_length(tvb, string_offset);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-dcerpc-nt.c
+--- 
+
++++ 
+
+@@ -498,7 +498,8 @@
+
+ 		 * and put the hash value in the policy handle hash
+
+ 		 * table.
+
+ 		 */
+
+-		value->list = pol;					// BUG_C58965E4(6) #CWE-476 #Dereference null pointer "value".
+
++		value = se_alloc(sizeof(pol_hash_value));		// FIX_C58965E4(6) #CWE-476 #Allocate memory for pointer "value".
+
++		value->list = pol;					// BUG_C58965E4(7) #CWE-476 #Write to dereferenced pointer "value".
+
+ 		pol->next = NULL;
+
+ 		key = se_alloc(sizeof(pol_hash_key));
+
+ 		memcpy(&key->policy_hnd, policy_hnd, sizeof(key->policy_hnd));
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-dcp-etsi.c
+--- 
+
++++ 
+
+@@ -257,7 +257,7 @@
+
+   fragment_data *fdx
+
+ )
+
+ {
+
+-  guint16 decoded_size;		// BUG_48FA9911(1) #CWE-190 #Declare "decoded_size" as "guint16"
+
++  guint32 decoded_size;		// FIX_48FA9911(1) #CWE-190 #Declare "decoded_size" as "guint32"
+
+   guint32 c_max;
+
+   guint32 rx_min;
+
+   gboolean first, last;
+
+@@ -272,7 +272,7 @@
+
+   first = findex == 0;
+
+   last = fcount == (findex+1);
+
+   c_max = fcount*plen/(rsk+PFT_RS_P);  /* rounded down */
+
+-  decoded_size = fcount*plen;				// BUG_48FA9911(2) #CWE-190 #CWE-131 #The multiplication can produce a result greater than 2^16, leading to an integer overflow if "decoded_size" is of type "guint16". Also, the calculation is wrong a return a size shorter than expected.
+
++  decoded_size = c_max*rsk+PFT_RS_N_MAX+PFT_RS_P;	// FIX_48FA9911(2) #CWE-190 #CWE-131 #The multiplication can produce a result greater than 2^16, but "decoded_size" is wide enough to contain it. Also, the calculation for the size is correct.
+
+   rx_min = c_max*rsk/plen; // BUG_85B4530F(4) FIX_85B4530F(5) #CWE-369 #Varialbe "plen" can be null, causing an divsion-by-zero exception
+
+   if(rx_min*plen<c_max*rsk)
+
+     rx_min++;
+
+@@ -336,11 +336,11 @@
+
+                                             NULL, tree);
+
+     }
+
+   }
+
+-  if(new_tvb) {								// BUG_48FA9911(3) #Don't check if "new_tvb" has enough data left to read
+
++  if(new_tvb && tvb_length(new_tvb) > 0) {				// FIX_48FA9911(3) #Do check if "new_tvb" has enough data left to read
+
+     gboolean decoded = TRUE;
+
+     tvbuff_t *dtvb = NULL;
+
+     const guint8 *input = tvb_get_ptr(new_tvb, 0, -1);
+
+-    guint16 reassembled_size = tvb_length(new_tvb);			// BUG_DE4059F0(1) #CWE-190 #Get the current packet's length and store it in "reassembled_size", but the length can be larger than 2^16, causing an integer overflow
+
++    guint32 reassembled_size = tvb_length(new_tvb);			// FIX_DE4059F0(1) #CWE-190 #Get the current packet's length and store it in "reassembled_size", which is of sufficient size to prevent an integer overflow
+
+     guint8 *deinterleaved = (guint8*) g_malloc (reassembled_size);	// BUG_DE4059F0(2) FIX_DE4059F0(2) #CWE-680 #Allocate memory for buffer "deinterleaved" using size "reassembled_size", which may have wrapped around, resulting in a potentially shorter buffer than expected
+
+     guint8 *output = (guint8*) g_malloc (decoded_size);			// BUG_48FA9911(4) FIX_48FA9911(4) #CWE-680 #CWE-131 #Allocate memory for buffer "output" using size "decoded_size", which may have wrapped around, resulting in a potential shorter buffer than expected, or may be too small for its expected use, later causing a buffer overflow.
+
+     rs_deinterleave(input, deinterleaved, plen, fcount);		// BUG_DE4059F0(3) FIX_DE4059F0(3) #Call function "rs_deinterleave", passing short buffer "deinterleaved" as output
+
+@@ -522,6 +522,7 @@
+
+       if(li)
+
+         proto_item_append_text(li, " (length error (%d))", real_len);
+
+     }
+
++    if (real_len)						// FIX_85B4530F(2) #CWE-369 #If the value of variable "real_len" is null, then don't call function "dissect_pft_fragmented"
+
+     next_tvb = dissect_pft_fragmented(tvb, pinfo, pft_tree,	// BUG_85B4530F(2) FIX_85B4530F(3) #4 #Passing possible null variable "real_len" to function "dissect_pft_fragmented"
+
+                                       findex, fcount, seq, offset, real_len,
+
+                                       fec, rsk, rsz
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-dnp.c
+--- 
+
++++ 
+
+@@ -2480,7 +2480,7 @@
+
+       memcpy(tmp_ptr, chk_ptr + data_offset, chk_size - data_offset);
+
+       calc_crc = calculateCRC(chk_ptr, chk_size);
+
+       offset += chk_size;
+
+-      tmp_ptr += chk_size + data_offset;			// BUG_D5F4E690(6) #CWE-823 #Adding "data_offset" to pointer "tmp_ptr" instead of substracting it, causing the pointer to point potentially 2 bytes off
+
++      tmp_ptr += chk_size - data_offset;			// FIX_D5F4E690(6) #CWE-823 #Substract "data_offset" from pointer "tmp_ptr", ensuring it points to the proper location in memory
+
+       act_crc = tvb_get_letohs(tvb, offset);
+
+       offset += 2;
+
+       crc_OK = calc_crc == act_crc;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-dns.c
+--- 
+
++++ 
+
+@@ -617,6 +617,7 @@
+
+ 	 * to put the dissector into a loop.  Instead we throw an exception */
+
+ 
+
+   maxname=MAXDNAME;
+
++  np=ep_alloc(maxname);							// FIX_52CA9094(2) #CWE-824 #Allocate memory for pointer "np".
+
+   *name=np;
+
+ 
+
+   maxname--;	/* reserve space for the trailing '\0' */
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-enttec.c
+--- 
+
++++ 
+
+@@ -194,8 +194,8 @@
+
+ 		"%03x: %s",
+
+ 		"%3u: %s"
+
+ 	};
+
+-	static guint8 dmx_data[512];					// BUG_2D623370(1) #Buffer allocated statically
+
+-	static guint16 dmx_data_offset[513];				// BUG_2D623370(2) #Buffer allocated statically
+
++	guint8 *dmx_data = ep_alloc(512 * sizeof(guint8));		// FIX_2D623370(1) #Buffer moved to ep_allocated
+
++	guint16 *dmx_data_offset = ep_alloc(513 * sizeof(guint16));	// FIX_2D623370(2) #Buffer moved to ep_allocated
+
+ 	emem_strbuf_t *dmx_epstr;
+
+ 
+
+ 	proto_tree *hi,*si;
+
+@@ -222,7 +222,7 @@
+
+ 					offset, 2, FALSE);
+
+ 	offset += 2;
+
+ 
+
+-	if (length > 512)						// BUG_2D623370(3) #No check on index "ui"
+
++	if (length > 512 && ui < 512)					// FIX_2D623370(3) #Added check on index "ui"
+
+ 		length = 512;
+
+ 
+
+ 	if (type == ENTTEC_DATA_TYPE_RLE) {
+
+@@ -237,7 +237,7 @@
+
+ 				ci++;
+
+ 				v = tvb_get_guint8(tvb, offset+ci);
+
+ 				ci++;
+
+-				for (i=0;i < count; i++) {		// BUG_2D623370(4) #No check on index "ui"
+
++				for (i=0;i < count && ui < 512;i++) {	// FIX_2D623370(4) #Added check on index "ui"
+
+ 					dmx_data[ui] = v;		// BUG_2D623370(5) FIX_2D623370(5) #CWE-119 #Index "ui" can be larger than the size of array "dmx_data", causing an overwrite.
+
+ 					dmx_data_offset[ui] = ci-3;
+
+ 					ui++;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-gsm_a_common.c
+--- 
+
++++ 
+
+@@ -699,7 +699,8 @@
+
+ 			{
+
+ 				gchar *a_add_string;		// BUG_2CC07361(1) FIX_2CC07361(1) #CWE-824 #Declare pointer "a_add_string" without initializing it.
+
+ 
+
+-				a_add_string[0] = '\0';		// BUG_2CC07361(2) #CWE-824 #Use of uninitialized pointer "a_add_string".
+
++				a_add_string=ep_alloc(1024);	// FIX_2CC07361(2) #CWE-824 #Allocate memory for pointer "a_add_string".
+
++				a_add_string[0] = '\0';		// FIX_2CC07361(3) #CWE-824 #Use of properly initialized pointer "a_add_string".
+
+ 				consumed =
+
+ 				(*elem_funcs[idx])(tvb, subtree, curr_offset + 2,
+
+ 					parm_len, a_add_string, 1024);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-gsm_a_gm.c
+--- 
+
++++ 
+
+@@ -5842,11 +5842,11 @@
+
+ 	NULL,						/* Reserved: was allocated in earlier phases of the protocol */
+
+ 	NULL,						/* Reserved: was allocated in earlier phases of the protocol */
+
+ 	dtap_sm_status,				/* SM Status */
+
+-								/* Activate MBMS Context Request */
+
+-								/* Activate MBMS Context Accept */
+
+-								/* Activate MBMS Context Reject */
+
+-								/* Request MBMS Context Activation */
+
+-								/* Request MBMS Context Activation Reject */
+
++	NULL,							/* Activate MBMS Context Request */
+
++	NULL,							/* Activate MBMS Context Accept */
+
++	NULL,							/* Activate MBMS Context Reject */
+
++	NULL,							/* Request MBMS Context Activation */
+
++	NULL,							/* Request MBMS Context Activation Reject */
+
+ 	NULL,	/* NONE */
+
+ };
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-gsm_bsslap.c
+--- 
+
++++ 
+
+@@ -248,7 +248,6 @@
+
+ {
+
+    guint32 curr_offset;
+
+    tvbuff_t *rrlp_tvb;
+
+-   static packet_info p_info;								// BUG_9ACE7B07(1) #Declare static structure "p_info" without initializing it
+
+ 
+
+    guint16 length;
+
+   
+
+@@ -259,7 +258,7 @@
+
+    {
+
+       rrlp_tvb = tvb_new_subset(tvb, curr_offset, length, length);
+
+       if (bsslap_rrlp_handle)
+
+-     	call_dissector(bsslap_rrlp_handle, rrlp_tvb, &p_info, tree);			// BUG_9ACE7B07(2) #Passing the address of uninitialized structure "p_info"
+
++        call_dissector(bsslap_rrlp_handle, rrlp_tvb, gsm_a_dtap_pinfo, tree);		// FIX_9ACE7B07(2) #Passing pointer "gsm_a_dtap_pinfo", which refers to a valid, initialized structure
+
+    }
+
+ 
+
+    curr_offset += length;
+
+@@ -807,6 +806,7 @@
+
+ 	int	offset=0;
+
+ 	guint8 octet;
+
+ 
+
++	gsm_a_dtap_pinfo = pinfo;							// FIX_9ACE7B07(1) #CWE-824 #Save "pinfo" in pointer "gsm_a_dtap_pinfo"
+
+ 
+
+ /* Make entries in Protocol column and Info column on summary display */
+
+ 	if (check_col(pinfo->cinfo, COL_PROTOCOL))
+
+@@ -907,7 +907,7 @@
+
+ 		},
+
+ 		{ &hf_gsm_bsslap_rrlp_flg,
+
+ 			{"RRLP Flag", "gsm_bsslap.rrlp_flg", 
+
+-			FT_UINT8, BASE_DEC, TFS(&gsm_bsslap_rrlp_flg_vals), 0x01, 	// BUG_B11C16A5(8) #CWE-788 #Alternative location: use wrong type "FT_UINT8" for string array "gsm_bsslap_rrlp_flg_vals", which is a pair of strings and is not null-terminated
+
++			FT_BOOLEAN, 8, TFS(&gsm_bsslap_rrlp_flg_vals), 0x01,		// FIX_B11C16A5(8) #CWE-788 #Alternative location: use proper type "FT_BOOLEAN" for string array "gsm_bsslap_rrlp_flg_vals"
+
+ 			"Cause", HFILL }
+
+ 		},
+
+ 		{ &hf_gsm_bsslap_tfi,
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-http.c
+--- 
+
++++ 
+
+@@ -2255,7 +2255,8 @@
+
+ 	range_foreach(http_ssl_range, range_delete_http_ssl_callback);
+
+ 	g_free(http_ssl_range);
+
+ 	
+
+-	range_foreach(http_ssl_range, range_add_http_ssl_callback); // BUG_16D311E6(1) #CWE-416 #Use of 'http_ssl_range' after free.
+
++	http_ssl_range = range_copy(global_http_ssl_range); // FIX_16D311E6(1) #CWE-416 #Reinitializing 'http_ssl_range' before using it.
+
++	range_foreach(http_ssl_range, range_add_http_ssl_callback); // FIX_16D311E6(2) #CWE-416 #Use of 'http_ssl_range' after init.
+
+ 
+
+ 	/* Attempt to add additional headers that might have been added
+
+ 	 * one the preferences are applied.
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-icmpv6.c
+--- 
+
++++ 
+
+@@ -568,6 +568,7 @@
+
+ 		/* Certificate */
+
+ 
+
+ 		if(cert_type == 1){
+
++			asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);										// FIX_848E3C4E(2) #CWE-457 #initializing structure "asn1_ctx" before using it
+
+ 			opt_offset = dissect_x509af_Certificate(FALSE, tvb, opt_offset, &asn1_ctx, icmp6opt_tree, hf_icmpv6_x509af_Certificate);	// BUG_848E3C4E(2) FIX_848E3C4E(3) #CWE-457 #Pass address of potentially uninitialized structure "asn1_ctx" to function "dissect_x509af_Certificate"
+
+ 			par_len = len - (opt_offset - offset);
+
+ 			/* Padding */
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-ieee80211.c
+--- 
+
++++ 
+
+@@ -4021,7 +4021,7 @@
+
+   cap_item = proto_tree_add_item(tree, vs ? ampduparam_vs : ampduparam, tvb,
+
+                     offset, 1, TRUE);
+
+   cap_tree = proto_item_add_subtree(cap_item, ett_ampduparam_tree);
+
+-  proto_tree_add_uint_format(cap_tree, ampduparam_mpdu, tvb, offset, 1, capability, decode_numeric_bitfield(capability, 0x03, 8,"Maximum Rx A-MPDU Length: %%04.0Lf [Bytes]"), pow(2,13+(capability & 0x3))-1);		// BUG_C728B755(1) #CWE-628 #CWE-125 #Format "%Lf" represents a long double number, but function "pow" returns a regular double, so when the format is parsed, it causes an overread
+
++  proto_tree_add_uint_format(cap_tree, ampduparam_mpdu, tvb, offset, 1, capability, decode_numeric_bitfield(capability, 0x03, 8,"Maximum Rx A-MPDU Length: %%04.0f [Bytes]"), pow(2,13+(capability & 0x3))-1);		// FIX_C728B755(1) #CWE-628 #CWE-125 #Correct format "%f" is used to display the return value of function "pow"
+
+   proto_tree_add_uint(cap_tree, ampduparam_mpdu_start_spacing, tvb, offset, 1, capability);
+
+   proto_tree_add_uint(cap_tree, ampduparam_reserved, tvb, offset, 1, capability);
+
+   offset += 1;
+
+@@ -4526,7 +4526,7 @@
+
+           proto_item_append_text(ti, ": \"%s\"",
+
+                                  format_text(ssid, tag_len));
+
+ 
+
+-          memcpy(wlan_stats.ssid, ssid, MAX_SSID_LEN);				// BUG_4257033C(2) #CWE-126 #Function "memcpy" will read "MAX_SSID_LEN" bytes from string "ssid", which can be shorter, leading to a buffer overread
+
++          memcpy(wlan_stats.ssid, ssid, MIN(tag_len, MAX_SSID_LEN));		// FIX_4257033C(2) #CWE-126 #Function "memcpy" will read string "ssid" in full or up to length "MAX_SSID_LEN"
+
+           wlan_stats.ssid_len = tag_len;
+
+         } else {
+
+           proto_item_append_text(ti, ": Broadcast");
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-infiniband.c
+--- 
+
++++ 
+
+@@ -497,40 +497,40 @@
+
+ static gint32
+
+ find_next_header_sequence(guint32 OpCode)
+
+ {
+
+-    if(contains(OpCode, &opCode_PAYLD[0], (gint32)sizeof(opCode_PAYLD)))										// BUG_E31410C9(1) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_PAYLD[0], (gint32)sizeof(opCode_PAYLD)/sizeof(opCode_PAYLD[0])))							// FIX_E31410C9(1) #CWE-131 #Passing the correct length to function "contains"
+
+         return PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_IMMDT_PAYLD[0], (gint32)sizeof(opCode_IMMDT_PAYLD)))									// BUG_E31410C9(2) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_IMMDT_PAYLD[0], (gint32)sizeof(opCode_IMMDT_PAYLD)/sizeof(opCode_IMMDT_PAYLD[0])))					// FIX_E31410C9(2) #CWE-131 #Passing the correct length to function "contains"
+
+         return IMMDT_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_RDETH_DETH_PAYLD[0], (gint32)sizeof(opCode_RDETH_DETH_PAYLD)))								// BUG_E31410C9(3) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_RDETH_DETH_PAYLD[0], (gint32)sizeof(opCode_RDETH_DETH_PAYLD)/sizeof(opCode_RDETH_DETH_PAYLD[0])))			// FIX_E31410C9(3) #CWE-131 #Passing the correct length to function "contains"
+
+         return RDETH_DETH_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_RETH_PAYLD[0], (gint32)sizeof(opCode_RETH_PAYLD)))									// BUG_E31410C9(4) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_RETH_PAYLD[0], (gint32)sizeof(opCode_RETH_PAYLD)/sizeof(opCode_RETH_PAYLD[0])))						// FIX_E31410C9(4) #CWE-131 #Passing the correct length to function "contains"
+
+         return RETH_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_RDETH_AETH_PAYLD[0], (gint32)sizeof(opCode_RDETH_AETH_PAYLD)))								// BUG_E31410C9(5) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_RDETH_AETH_PAYLD[0], (gint32)sizeof(opCode_RDETH_AETH_PAYLD)/sizeof(opCode_RDETH_AETH_PAYLD[0])))			// FIX_E31410C9(5) #CWE-131 #Passing the correct length to function "contains"
+
+         return RDETH_AETH_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_AETH_PAYLD[0], (gint32)sizeof(opCode_AETH_PAYLD)))									// BUG_E31410C9(6) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_AETH_PAYLD[0], (gint32)sizeof(opCode_AETH_PAYLD)/sizeof(opCode_AETH_PAYLD[0])))						// FIX_E31410C9(6) #CWE-131 #Passing the correct length to function "contains"
+
+         return AETH_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_RDETH_DETH_IMMDT_PAYLD[0], (gint32)sizeof(opCode_RDETH_DETH_IMMDT_PAYLD)))						// BUG_E31410C9(7) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_RDETH_DETH_IMMDT_PAYLD[0], (gint32)sizeof(opCode_RDETH_DETH_IMMDT_PAYLD)/sizeof(opCode_RDETH_DETH_IMMDT_PAYLD[0])))	// FIX_E31410C9(7) #CWE-131 #Passing the correct length to function "contains"
+
+         return RDETH_DETH_IMMDT_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_RETH_IMMDT_PAYLD[0], (gint32)sizeof(opCode_RETH_IMMDT_PAYLD)))								// BUG_E31410C9(8) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_RETH_IMMDT_PAYLD[0], (gint32)sizeof(opCode_RETH_IMMDT_PAYLD)/sizeof(opCode_RETH_IMMDT_PAYLD[0])))			// FIX_E31410C9(8) #CWE-131 #Passing the correct length to function "contains"
+
+         return RETH_IMMDT_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_RDETH_DETH_RETH_PAYLD[0], (gint32)sizeof(opCode_RDETH_DETH_RETH_PAYLD)))						// BUG_E31410C9(9) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_RDETH_DETH_RETH_PAYLD[0], (gint32)sizeof(opCode_RDETH_DETH_RETH_PAYLD)/sizeof(opCode_RDETH_DETH_RETH_PAYLD[0])))	// FIX_E31410C9(9) #CWE-131 #Passing the correct length to function "contains"
+
+         return RDETH_DETH_RETH_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_ATOMICETH[0], (gint32)sizeof(opCode_ATOMICETH)))									// BUG_E31410C9(10) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_ATOMICETH[0], (gint32)sizeof(opCode_ATOMICETH)/sizeof(opCode_ATOMICETH[0])))						// FIX_E31410C9(10) #CWE-131 #Passing the correct length to function "contains"
+
+         return ATOMICETH;
+
+ 
+
+-    if(contains(OpCode, &opCode_IETH_PAYLD[0], (gint32)sizeof(opCode_IETH_PAYLD)))									// BUG_E31410C9(11) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_IETH_PAYLD[0], (gint32)sizeof(opCode_IETH_PAYLD)/sizeof(opCode_IETH_PAYLD[0])))						// FIX_E31410C9(11) #CWE-131 #Passing the correct length to function "contains"
+
+         return IETH_PAYLD;
+
+ 
+
+-    if(contains(OpCode, &opCode_RDETH_DETH_ATOMICETH[0], (gint32)sizeof(opCode_RDETH_DETH_ATOMICETH)))							// BUG_E31410C9(12) #CWE-131 #Passing a much larger length to function "contains"
+
++    if(contains(OpCode, &opCode_RDETH_DETH_ATOMICETH[0], (gint32)sizeof(opCode_RDETH_DETH_ATOMICETH)/sizeof(opCode_RDETH_DETH_ATOMICETH[0])))		// FIX_E31410C9(12) #CWE-131 #Passing the correct length to function "contains"
+
+         return RDETH_DETH_ATOMICETH;
+
+     if((OpCode ^ RC_ACKNOWLEDGE) == 0)
+
+         return AETH;
+
+@@ -939,7 +939,6 @@
+
+ 
+
+ 
+
+             } else {
+
+-                tvb_free(next_tvb);			// BUG_ACBA7CD4(1) #CWE-416 #Free pointer "next_tvb" only on this branch, while it is still in use in the program
+
+             }
+
+                 
+
+         }
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-ip.c
+--- 
+
++++ 
+
+@@ -639,7 +639,7 @@
+
+     {IPSEC_RESERVED6,    "Reserved"    },
+
+     {IPSEC_RESERVED7,    "Reserved"    },
+
+     {IPSEC_RESERVED8,    "Reserved"    },
+
+-    };						// BUG_B11C16A5(1) #CWE-170 #No null terminator
+
++    {0,                  NULL          } };	// FIX_B11C16A5(1) #CWE-170 #Null terminator
+
+ 
+
+   tf = proto_tree_add_text(opt_tree, tvb, offset,      optlen, "%s:", optp->name);
+
+   field_tree = proto_item_add_subtree(tf, *optp->subtree_index);
+
+@@ -647,7 +647,7 @@
+
+ 
+
+   val = tvb_get_ntohs(tvb, offset);
+
+   proto_tree_add_text(field_tree, tvb, offset,       2,
+
+-              "Security: %s", val_to_str(val, secl_vals, "Unknown (0x%x)")); // BUG_B11C16A5(2) #Function "val_to_str" overreads "secl_vals" because the latter has no null terminator
+
++              "Security: %s", val_to_str(val, secl_vals, "Unknown (0x%x)")); // FIX_B11C16A5(2) #Function "val_to_str" stops on the null terminator in "secl_vals" 
+
+   offset += 2;
+
+ 
+
+   val = tvb_get_ntohs(tvb, offset);
+
+@@ -755,10 +755,10 @@
+
+ 	      cat_str_tmp[USHRT_MAX_STRLEN - 1] = '\0';
+
+ 	      if (cat_str_len < (strlen(cat_str) + 2 + USHRT_MAX_STRLEN)) {
+
+ 		char *cat_str_new;
+
+-		while (cat_str_len < (strlen(cat_str) + 128 + USHRT_MAX_STRLEN))	// BUG_48FA7F97(1) #CWE-131 #Calculate a larger size "cat_str_len" for destination buffer "cat_str_new"
+
++		while (cat_str_len < (strlen(cat_str) + 2 + USHRT_MAX_STRLEN))		// FIX_48FA7F97(1) #CWE-131 #Calculate the proper size "cat_str_len" for destination buffer "cat_str_new"
+
+ 		  cat_str_len += cat_str_len;
+
+-		cat_str_new = ep_alloc(cat_str_len);					// BUG_48FA7F97(2) #Allocate "cat_str_len" bytes for destination buffer "cat_str_new"
+
+-		memcpy(cat_str_new, cat_str, cat_str_len);				// BUG_48FA7F97(3) #CWE-126 #Copy "cat_str_len" bytes to destination buffer "cat_str_new", not stopping at the first null terminator in "cat_str", causing an overread of the latter
+
++		cat_str_new = ep_alloc(cat_str_len);					// FIX_48FA7F97(2) #Allocate "cat_str_len" bytes for destination buffer "cat_str_new"
+
++		g_strlcpy(cat_str_new, cat_str, cat_str_len);				// FIX_48FA7F97(3) #CWE-126 #Copy at most "cat_str_len" bytes to destination buffer "cat_str_new", stopping at the first null terminator in "cat_str"
+
+ 		cat_str_new[cat_str_len - 1] = '\0';
+
+ 		cat_str = cat_str_new;
+
+ 	      }
+
+@@ -1286,8 +1286,13 @@
+
+           proto_tree_add_text(opt_tree, tvb, offset,    len, "%s (%u byte%s)",
+
+ 				name, len, plurality(len, "", "s"));
+
+         } else {
+
++          if (dissect != NULL) {						// FIX_B8F041DB(1) #Check if pointer "dissect" is null
+
+             /* Option has a dissector. */
+
+-            (*dissect)(optp, tvb, offset,          len, pinfo, opt_tree);	// BUG_B8F041DB(2) #CWE-476 #Call pointer "dissect" which can be null
+
++            (*dissect)(optp, tvb, offset,          len, pinfo, opt_tree);	// FIX_B8F041DB(2) #CWE-476 #Execute the function pointed to by "dissect"
+
++          } else {
+
++            /* Option has no data, hence no dissector. */
+
++            proto_tree_add_text(opt_tree, tvb, offset,  len, "%s", name);
+
++          }
+
+         }
+
+         len -= 2;	/* subtract size of type and length */
+
+         offset += 2 + len;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-ipmi-se.c
+--- 
+
++++ 
+
+@@ -2740,7 +2740,7 @@
+
+ 	int len = tvb_length(tvb);								// BUG_28B3BB4B(4) FIX_28B3BB4B(4) #Read the packet length from the container, which was determined by tainted data
+
+ 	int i, j, val, msk;
+
+ 
+
+-	for (i = 0; offs < len; i++, offs++) {							// BUG_28B3BB4B(5) #CWE-834 #Iterate from "offs" to "len"
+
++	for (i = 0; offs < len && i < sizeof tsel / sizeof *tsel; i++, offs++) {		// FIX_28B3BB4B(5) #CWE-834 #Iterate from "offs" to "len" or from 0 to "tsel's" size, whichever is lower
+
+ 		val = tvb_get_guint8(tvb, offs);
+
+ 		ti = proto_tree_add_text(tree, tvb, offs, 1, "%s (byte %d)", desc, i);
+
+ 		s_tree = proto_item_add_subtree(ti, *tsel[i]);					// BUG_28B3BB4B(6) FIX_28B3BB4B(6) #CWE-126 #Index "i" can be larger than the size of buffer "tsel" if "len" is large enough, causing an overread 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-ipmi-transport.c
+--- 
+
++++ 
+
+@@ -927,7 +927,7 @@
+
+ 	guint i;
+
+ 	guint8 v, v1, v2;
+
+ 
+
+-	for (i = 0; i <= 8; i++) {										// BUG_1B24CC26(1) #CWE-834 #The loop condition is off-by-one, letting "i" reach value 8
+
++	for (i = 0; i < 8; i++) {										// FIX_1B24CC26(1) #CWE-834 #The loop condition keeps "i" into an acceptable range of values
+
+ 		v = tvb_get_guint8(tvb, i + 1);
+
+ 		v1 = v & 0x0f;
+
+ 		v2 = v >> 4;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-ipmi.c
+--- 
+
++++ 
+
+@@ -749,9 +749,9 @@
+
+ 	len = typelen & msk;
+
+ 	ptr->get_len(&clen, &blen, tvb, offs + 1, len, is_fru);
+
+ 
+
+-	str = ep_alloc(clen);				// BUG_27748E77(1) #CWE-193 #Allocate "clen" byte to buffer "str"
+
++	str = ep_alloc(clen + 1);			// FIX_27748E77(1) #CWE-193 #Allocate one extra byte for the null terminator
+
+ 	ptr->parse(str, tvb, offs + 1, clen);
+
+-	str[clen] = '\0';				// BUG_27748E77(2) #CWE-118 #CWE-122 #Write a null terminator one byte farther than the end of buffer "str"
+
++	str[clen] = '\0';				// FIX_27748E77(2) #CWE-118 #Write the null terminator at the last byte of buffer "str"
+
+ 
+
+ 	ti = proto_tree_add_text(tree, tvb, offs, 1, "%s Type/Length byte: %s, %d %s",
+
+ 			desc, ptr->desc, len, unit);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-isakmp.c
+--- 
+
++++ 
+
+@@ -1036,6 +1036,7 @@
+
+ 
+
+ #ifdef HAVE_LIBGCRYPT
+
+ 
+
++  pinfo->private_data = NULL;											// FIX_AD8F584C(1) #CWE-824 #Initialize pointer "pinfo->private_data"
+
+ 
+
+   if (isakmp_version == 1) {
+
+     SET_ADDRESS(&null_addr, AT_NONE, 0, NULL);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-kerberos.c
+--- 
+
++++ 
+
+@@ -4685,6 +4685,7 @@
+
+ 
+
+ 	get_ber_identifier(tvb, offset, &tmp_class, &tmp_pc, &tmp_tag);
+
+         if(tmp_class!=BER_CLASS_APP){
+
++	    pinfo->private_data=saved_private_data;				// FIX_419BD03E(7) #Restore pointer "pinfo->private_data" from "saved_private_data", so it won't be NULL
+
+             return 0;
+
+         }
+
+         switch(tmp_tag){
+
+@@ -4707,6 +4708,7 @@
+
+             case KRB5_MSG_ERROR:
+
+                 break;
+
+             default:
+
++                pinfo->private_data=saved_private_data;				// FIX_419BD03E(8) #Restore pointer "pinfo->private_data" from "saved_private_data", so it won't be NULL
+
+                 return 0;
+
+         }
+
+ 	if (do_col_protocol) {
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-nbns.c
+--- 
+
++++ 
+
+@@ -466,8 +466,9 @@
+
+ 
+
+ #define MAX_BUF_SIZE (128+1)
+
+ 
+
++	buf=ep_alloc(MAX_BUF_SIZE);									// FIX_4E27A311(2) #CWE-824 #Allocate memory for pointer "buf".
+
+ 	opcode = (guint16) ((flags & F_OPCODE) >> OPCODE_SHIFT);
+
+-	g_snprintf(buf, MAX_BUF_SIZE, "%s", val_to_str(opcode, opcode_vals, "Unknown operation"));	// BUG_4E27A311(2) #CWE-824 #Write to unitialized pointer "buf".
+
++	g_snprintf(buf, MAX_BUF_SIZE, "%s", val_to_str(opcode, opcode_vals, "Unknown operation"));	// FIX_4E27A311(3) #CWE-824 #Write to the freshly allocated memory pointed to by "buf".
+
+ 
+
+ 	if (flags & F_RESPONSE && !is_wack) {
+
+ 		g_strlcat(buf, " response", MAX_BUF_SIZE);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-netflow.c
+--- 
+
++++ 
+
+@@ -2728,6 +2728,12 @@
+
+ 			    offset, 2, FALSE);
+
+ 	offset += 2;
+
+ 
+
++	if (flowset_id == 3) {							// FIX_BE33920B(1) #7 #Sanity check on "option_len"
+
++	       if (option_len > option_scope_len || option_len == 0)
+
++			return 0;
+
++
+
++	       option_scope_len -= option_len;
+
++       }
+
+ 
+
+ 	scopes_offset = offset;
+
+ 
+
+@@ -2775,20 +2781,20 @@
+
+ 	memset(&template, 0, sizeof(template));
+
+ 	template.id = id;
+
+ 
+
+-	template.count = option_len/4;						// BUG_BE33920B(1) #CWE-131 #Initialize "template.count"
+
++	template.count = option_len;						// FIX_BE33920B(2) #CWE-131 #Initialize "template.count"
+
+ 
+
+ 	SE_COPY_ADDRESS(&template.source_addr, &hdrinfo->net_src);
+
+ 	template.source_id = hdrinfo->src_id;
+
+ 	/* Option scopes */
+
+ 
+
+-	template.count_scopes = option_scope_len/4;
+
+-	size = template.count_scopes * sizeof(struct v9_template_entry) + scope_pen_count * 4;
+
++	template.count_scopes = option_scope_len;
+
++    size = (template.count_scopes + scope_pen_count) * sizeof(struct v9_template_entry);
+
+ 	template.scopes      = g_malloc( size );
+
+ 	tvb_memcpy(tvb, (guint8 *)template.scopes, scopes_offset, size);
+
+ 
+
+ 	template.option_template = 1; /* Option template */
+
+ 	
+
+-	size = template.count * sizeof(struct v9_template_entry) + pen_count * 4; // BUG_BE33920B(2) #CWE-131 #Incorrect calculation of array size, depending on the platform
+
++	size = (template.count + pen_count) * sizeof(struct v9_template_entry);	// FIX_BE33920B(3) #CWE-131 #Correct calculation of array size
+
+ 	template.entries = g_malloc(size);					// BUG_BE33920B(3) FIX_BE33920B(4) #CWE-131 #Allocate "size" byte to array "template.entries", which may be too small for its inteded purpose	 
+
+ 	tvb_memcpy(tvb, (guint8 *)template.entries, template_offset, size);
+
+ 
+
+@@ -2876,9 +2882,9 @@
+
+ 			}
+
+ 		}
+
+ 
+
+-		template.entries = g_malloc(count * sizeof(struct v9_template_entry) + pen_count * 4);	// BUG_BE33920B(5) #CWE-131 #Alternative location where the amount of memory allocated for array "template.entries" can be incorrect on some platforms
+
++		template.entries = se_alloc((count + pen_count) * sizeof(struct v9_template_entry));	// FIX_BE33920B(6) #CWE-131 #Alternative location where the proper amount of memory for array "template.entries" is allocated
+
+ 		tvb_memcpy(tvb, (guint8 *)template.entries, field_start_offset,
+
+-			count * sizeof(struct v9_template_entry) + pen_count * 4);
+
++			(count + pen_count) * sizeof(struct v9_template_entry));
+
+ 		v9_template_add(&template);								// BUG_BE33920B(6) FIX_BE33920B(7) #Call sink function
+
+ 		remaining -= 4 + sizeof(struct v9_template_entry) * count;
+
+ 		if (pen_count > 0) {
+
+@@ -3166,13 +3172,14 @@
+
+ 		template->length += template->scopes[i].length;
+
+ 	}
+
+ 
+
+-	for (i = 0; i < template->count; i++) {								// BUG_BE33920B(7) #CWE-129 #Only check that index "i" remains within the bounds of array "template->entries", but the array is accessed by adding "pen_count" to "i" and the result can be greater than the array's size
+
++	for (i = 0; i + pen_count < template->count; i++) {						// FIX_BE33920B(8) #CWE-129 #Validate that index "i + pen_count" remains within the bounds of array "template->entries"
+
+ 		template->entries[i + pen_count].type = g_ntohs(template->entries[i + pen_count].type);	// BUG_BE33920B(8) FIX_BE33920B(9) #CWE-119 #5 #If not checked, index "i + pen_count" can be greater than the size of array "template->entries", causing both a buffer overread and overwrite
+
+ 		tmp_length = g_ntohs(template->entries[i + pen_count].length);
+
+ 		template->entries[i + pen_count].length = tmp_length == VARIABLE_LENGTH ? 0 : tmp_length;
+
+ 		template->length += template->entries[i + pen_count].length;
+
+ 		if (template->entries[i + pen_count].type & 0x8000) {
+
+ 			pen_count++;									// BUG_BE33920B(9) FIX_BE33920B(10) #CWE-129 #Increment index "pen_count"
+
++			if(i + pen_count < template->count)						// FIX_BE33920B(11) #CWE-129 #Validate that index "i + pen_count" remains within the bounds of array "template->entries"
+
+ 				*(guint32 *)&template->entries[i + pen_count] =				// BUG_BE33920B(10) FIX_BE33920B(12) #2 #CWE-119 #If not checked, index "i + pen_count" can be greater than the size of array "template->entries", causing both a buffer overread and overwrite
+
+ 					g_ntohl(*(guint32 *)&template->entries[i + pen_count]);
+
+ 		}
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-ntlmssp.c
+--- 
+
++++ 
+
+@@ -957,8 +957,9 @@
+
+ 
+
+   if (!conversation_get_proto_data(conversation, proto_ntlmssp)) {
+
+     
+
++    conv_ntlmssp_info = se_alloc(sizeof(ntlmssp_info));	// FIX_A751D662(2) #CWE-824 #"conv_ntlmssp_info" is allocated before use.
+
+     /* Insert the flags into the conversation */
+
+-    conv_ntlmssp_info->flags = negotiate_flags;		// BUG_A751D662(2) #CWE-824 #Pointer "conv_ntlmssp_info" is uninitialized and dereferenced, causing an invalid pointer access.
+
++    conv_ntlmssp_info->flags = negotiate_flags;		// FIX_A751D662(3) #CWE-824 #Pointer "conv_ntlmssp_info" is valid and properly dereferenced.
+
+     /* Insert the RC4 state information into the conversation */
+
+     tvb_memcpy(tvb, challenge, offset, 8);
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-q931.c
+--- 
+
++++ 
+
+@@ -3113,8 +3113,8 @@
+
+ 						proto_tree_add_text(ie_tree, tvb,
+
+ 							offset + 2, info_element_len,
+
+ 							"Data: %s",
+
+-							bytes_to_str(									// BUG_256C7C53(2) #Pass invalid pointer as first parameter to function "bytes_to_str".
+
+-							  tvb_get_ptr(tvb, offset + 2, info_element_len) + offset, info_element_len));	// BUG_256C7C53(1) #CWE-823 #Add offset to the pointer returned by function "tvb_get_ptr", making it point out-of-bound.
+
++							bytes_to_str(									// FIX_256C7C53(2) #Pass valid pointer as first parameter to function "bytes_to_str".
+
++							  tvb_get_ptr(tvb, offset + 2, info_element_len), info_element_len));		// FIX_256C7C53(1) #CWE-823 #The pointer returned by function "tvb_get_ptr" is valid.
+
+ 					}
+
+ 					break;
+
+ 				}
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-radius.c
+--- 
+
++++ 
+
+@@ -894,7 +894,7 @@
+
+             item = proto_tree_add_text(tree, tvb, offset, 0,
+
+                         "Not enough room in packet for AVP header");
+
+             PROTO_ITEM_SET_GENERATED(item);
+
+-            return;								// BUG_79A7B3EC(2) #CWE-460 #Return without cleanup, so the stack has a callback stacked on it that hasn't been popped, throwing off the program and ultimately leading to a crash.
+
++            break;								// FIX_79A7B3EC(2) #CWE-460 #Exit outer loop, then cleanup & return
+
+         }
+
+         avp_type = tvb_get_guint8(tvb,offset);
+
+         avp_length = tvb_get_guint8(tvb,offset+1);
+
+@@ -903,14 +903,14 @@
+
+             item = proto_tree_add_text(tree, tvb, offset, 0,
+
+                         "AVP too short: length %u < 2", avp_length);
+
+             PROTO_ITEM_SET_GENERATED(item);
+
+-            return;								// BUG_79A7B3EC(3) #CWE-460 #Return without cleanup, so the stack has a callback stacked on it that hasn't been popped, throwing off the program and ultimately leading to a crash.
+
++            break;								// FIX_79A7B3EC(3) #CWE-460 #Exit outer loop, then cleanup & return
+
+         }
+
+ 
+
+         if (length < avp_length) {
+
+             item = proto_tree_add_text(tree, tvb, offset, 0,
+
+                         "Not enough room in packet for AVP");
+
+             PROTO_ITEM_SET_GENERATED(item);
+
+-            return;								// BUG_79A7B3EC(4) #CWE-460 #Return without cleanup, so the stack has a callback stacked on it that hasn't been popped, throwing off the program and ultimately leading to a crash.
+
++            break;								// FIX_79A7B3EC(4) #CWE-460 #Exit outer loop, then cleanup & return
+
+         }
+
+ 
+
+         length -= avp_length;
+
+@@ -1002,7 +1002,7 @@
+
+                 if (avp_vsa_len < avp_vsa_header_len) {
+
+                     proto_tree_add_text(tree, tvb, offset+1, 1,
+
+                                             "[VSA too short]");
+
+-                    return;							// BUG_79A7B3EC(5) #CWE-460 #Return without cleanup, so the stack has a callback stacked on it that hasn't been popped, throwing off the program and ultimately leading to a crash.
+
++                    break;							// FIX_79A7B3EC(5) #CWE-460 #Exit outer loop, then cleanup & return
+
+                 }
+
+ 
+
+                 avp_vsa_len -= avp_vsa_header_len;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-rsvp.c
+--- 
+
++++ 
+
+@@ -5877,8 +5877,7 @@
+
+ 	break;
+
+     }
+
+ 
+
+-    SET_ADDRESS(&request_key.source_info.source,					// BUG_916FD15B(4) #CWE-416 #Structure "rsvph->source" is stored in ephemeral memory, and its address is copied to "request_key.source_info.source" for later use
+
+-		rsvph->source.type, rsvph->source.len, rsvph->source.data);
+
++    SE_COPY_ADDRESS(&request_key.source_info.source, &rsvph->source);			// FIX_916FD15B(4) #CWE-416 #Allocate long term memory to store "rsvp->source"
+
+     request_key.source_info.udp_source_port = rsvph->udp_source_port;
+
+ 
+
+     /* See if a request with this key already exists */
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-rtps.c
+--- 
+
++++ 
+
+@@ -2789,6 +2789,7 @@
+
+     offset += 4;
+
+     for (j = 0; j < 32; ++j) {							// BUG_BFE3CCB1(5) FIX_BFE3CCB1(5) #Loop up to 32 using counter "j"
+
+       datamask = (1 << (31-j));
+
++      if (idx < num_bits && idx < MAX_BITMAP_SIZE-1)				// FIX_BFE3CCB1(6) #Check if index "idx" remains in the proper range
+
+       temp_buff[idx++] = ((data & datamask) == datamask) ? '1':'0';		// BUG_BFE3CCB1(6) FIX_BFE3CCB1(7) #CWE-121 #If index "idx" is not properly checked, it could exceed the size of array "temp_buff", causing a buffer overflow
+
+       if (idx > num_bits) {
+
+         break;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-rtps2.c
+--- 
+
++++ 
+
+@@ -3067,6 +3067,7 @@
+
+     for (j = 0; j < 32; ++j) {							// BUG_D5800C2A(5) FIX_D5800C2A(5) #Loop up to 32 using counter "j"
+
+       datamask = (1 << (31-j));
+
+ 
+
++      if (idx < num_bits && idx < MAX_BITMAP_SIZE-1)				// FIX_D5800C2A(6) #Check if index "idx" remains in the proper range
+
+         temp_buff[idx++] = ((data & datamask) == datamask) ? '1':'0';		// BUG_D5800C2A(6) FIX_D5800C2A(7) #CWE-121 #If index "idx" is not properly checked, it could exceed the size of array "temp_buff", causing a buffer overflow
+
+       if (idx >= num_bits) {
+
+         break;
+
+@@ -3189,6 +3190,7 @@
+
+     offset += 4;
+
+     for (j = 0; j < 32; ++j) {							// BUG_533440B6(5) FIX_533440B6(5) #Loop up to 32 using counter "j"
+
+       datamask = (1 << (31-j));
+
++      if (idx < num_bits && idx < MAX_BITMAP_SIZE-1)				// FIX_533440B6(6) #Check if index "idx" remains in the proper range
+
+       temp_buff[idx++] = ((data & datamask) != 0) ? '1':'0';			// BUG_533440B6(6) FIX_533440B6(7) #CWE-121 #If index "idx" is not properly checked, it could exceed the size of array "temp_buff", causing a buffer overflow
+
+       if (idx > num_bits) {
+
+         break;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-sigcomp.c
+--- 
+
++++ 
+
+@@ -424,7 +424,10 @@
+
+ 	sigcomp_tree = proto_item_add_subtree(ti, ett_sigcomp);
+
+ 	i=0;
+
+ 	end_off_message = FALSE;
+
+-	buff = g_malloc(length-offset);						// BUG_36CC316B(4) #CWE-190 #CWE-789 #CWE-248 #Since "length" is set at one and "offset" at two, the difference is negative and wraps around, causing a very large allocation of memory, causing "g_malloc" to throw an exception that isn't caught.
+
++	if(offset < length)							// FIX_36CC316B(4) #4 #CWE-190 #CWE-789 #CWE-248 #Check if "length" is larger than "offset", so the allocation size is positive, or return
+
++		buff = g_malloc(length-offset);
+
++	else
+
++		return -1;
+
+ 	if (udvm_print_detail_level>2)
+
+ 		proto_tree_add_text(sigcomp_tree, tvb, offset, -1,"Starting to remove escape digits");
+
+ 	while ((offset < length) && (end_off_message == FALSE)){
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-smb.c
+--- 
+
++++ 
+
+@@ -2123,7 +2123,8 @@
+
+ 
+
+ 	if (!pinfo->fd->flags.visited && si->sip) {
+
+ 
+
+-		dialects->num = 0;						// BUG_E8EE6FC2(2) #CWE-476 #Pointer "dialects" is null and dereferenced.
+
++		dialects = se_alloc(sizeof(struct negprot_dialects));		// FIX_E8EE6FC2(2) #CWE-476 #Allocate memory for pointer "dialects".
+
++		dialects->num = 0;						// FIX_E8EE6FC2(3) #CWE-476 #Pointer "dialects" is valid and dereferenced.
+
+ 		si->sip->extra_info_type = SMB_EI_DIALECTS;
+
+ 		si->sip->extra_info = dialects;
+
+ 	}
+
+@@ -8207,6 +8208,7 @@
+
+ 	case NT_TRANS_IOCTL:
+
+ 		/* ioctl data */
+
+ 		ioctl_tvb=tvb_new_subset(tvb, offset, MIN((int)bc, tvb_length_remaining(tvb, offset)), bc);
+
++		if (nti)											// FIX_40CB269F(5) #Check pointer "nti" before dereferencing it
+
+ 		dissect_smb2_ioctl_data(ioctl_tvb, pinfo, tree, top_tree, nti->ioctl_function, TRUE);		// BUG_40CB269F(5) FIX_40CB269F(6) #CWE-476 #Potentially null pointer "nti" is dereferenced
+
+ 
+
+ 
+
+@@ -8427,7 +8429,7 @@
+
+ 	proto_tree *tree = NULL;
+
+ 	int old_offset = offset;
+
+ 	smb_info_t *si;
+
+-	smb_nt_transact_info_t *nti;										// BUG_4C4FDA1B(1) #CWE-476 #Declaration without initialization
+
++	smb_nt_transact_info_t *nti = NULL;									// FIX_4C4FDA1B(1) #CWE-476 #Initializing pointer "nti" to NULL
+
+ 	smb_saved_info_t *sip;
+
+ 
+
+ 
+
+@@ -8435,7 +8437,9 @@
+
+ 	DISSECTOR_ASSERT(si);
+
+ 	sip = si->sip;
+
+ 	DISSECTOR_ASSERT(sip);
+
+-	nti=sip->extra_info;
+
++	if (sip->extra_info_type == SMB_EI_NTI) {
+
++		nti=sip->extra_info;
+
++    }
+
+ 
+
+ 	if(parent_tree){
+
+ 		tvb_ensure_bytes_exist(tvb, offset, len);
+
+@@ -8452,7 +8456,7 @@
+
+ 		guint16 fid;
+
+ 
+
+ 		/* function code */
+
+-		offset = dissect_smb2_ioctl_function(tvb, pinfo, tree, offset, &nti->ioctl_function);		// BUG_4C4FDA1B(2) #CWE-476 #Can trigger a NULL pointer dereference
+
++		offset = dissect_smb2_ioctl_function(tvb, pinfo, tree, offset, nti ? &nti->ioctl_function : NULL); // FIX_4C4FDA1B(2) #CWE-476 #Check pointer "nti" before dereferencing it
+
+ 
+
+ 		/* fid */
+
+ 		fid = tvb_get_letohs(tvb, offset);
+
+@@ -10496,7 +10500,7 @@
+
+ 		/* search pattern */
+
+ 		fn = get_unicode_or_ascii_string(tvb, &offset, si->unicode, &fn_len, FALSE, FALSE, &bc);
+
+ 		CHECK_STRING_TRANS(fn);
+
+-		if(!t2i->name){											// BUG_A64A9234(3) #CWE-476 #Pointer "t2i" can be null and is dereferenced
+
++		if(t2i && !t2i->name){										// FIX_A64A9234(3) #CWE-476 #Check the value of pointer "t2i" before dereferencing it
+
+ 			t2i->name = se_strdup(fn);								// BUG_A64A9234(4) FIX_A64A9234(4) #CWE-476 #Another dereference of pointer "t2i" that can cause a crash
+
+ 		}
+
+ 		proto_tree_add_string(tree, hf_smb_search_pattern, tvb, offset, fn_len,
+
+@@ -10593,7 +10597,7 @@
+
+ 		proto_tree_add_string(tree, hf_smb_file_name, tvb, offset, fn_len,
+
+ 			fn);
+
+ 		COUNT_BYTES_TRANS(fn_len);
+
+-		if(!t2i->name){											// BUG_A64A9234(5) #CWE-476 #Another location where "t2i" is not checked before being dereferenced
+
++		if(t2i && !t2i->name){										// FIX_A64A9234(5) #CWE-476 #Another location where "t2i" is checked before being dereferenced
+
+ 			t2i->name = se_strdup(fn);								// BUG_A64A9234(6) FIX_A64A9234(6) #CWE-476 #Another possibly problematic dereference of pointer "t2i"
+
+ 		}
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-smb2.c
+--- 
+
++++ 
+
+@@ -953,7 +953,8 @@
+
+ 
+
+ 	ioctl_function=tvb_get_letohl(tvb, offset);
+
+ 
+
+-	*ioctlfunc=ioctl_function; // BUG_4C4FDA1B(3) #CWE-476 #Pointer "ioctlfunc" can be invalid and is dereferenced
+
++	if (ioctlfunc) // FIX_4C4FDA1B(3) #2 #CWE-476 #Check pointer "ioctlfunc" before dereferencing it
+
++	    *ioctlfunc=ioctl_function;
+
+ 	if(ioctl_function){
+
+ 		/* device */
+
+ 		proto_tree_add_item(tree, hf_smb2_ioctl_function_device, tvb, offset, 4, TRUE);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-ssl.c
+--- 
+
++++ 
+
+@@ -280,6 +280,7 @@
+
+   "TLSv1.1",
+
+   "DTLSv1.0",
+
+   "PCT",
+
++  "TLSv1.2"										// FIX_2AB010E1(2) #CWE-126 #Added missing entry "TLSv1.2"	
+
+ };
+
+ /* Forward declaration we need below */
+
+ void proto_reg_handoff_ssl(void);
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-tcap.c
+--- 
+
++++ 
+
+@@ -2067,7 +2067,7 @@
+
+ 
+
+ 	    if (len-(2*ind_field)) /*should always be positive unless we get an empty contructor pointless? */
+
+ 	    {
+
+-		next_tvb = tvb_new_subset(tvb + len * ind_field, offset, len-(2*ind_field),	// BUG_7169C840(1) #2 #CWE-823 #Adding a user-controlled value to pointer "tvb" can turn it into an invalid pointer, in which case return pointer "next_tvb" is invalid.  Note that "ind_field" is 0 or 1.
+
++		next_tvb = tvb_new_subset(tvb, offset, len-(2*ind_field),			// FIX_7169C840(1) #2 #CWE-823 #Pointer "tvb" is valid so return value "next_tvb" is also valid.
+
+ 					  len-(2*ind_field));
+
+ 		dissect_tcap_param(actx, subtree,next_tvb,0);					// BUG_7169C840(6) FIX_7169C840(6) #Pass pointer "next_tvb" to function "dissect_tcap_param".
+
+ 	    }
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-x509sat.c
+--- 
+
++++ 
+
+@@ -1503,7 +1503,7 @@
+
+ static int
+
+ dissect_x509sat_SyntaxBMPString(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+
+ #line 323 "x509sat.cnf"
+
+-  tvbuff_t *wide_tvb;										// BUG_E02CFE60(1) #CWE-824 #Declare pointer "wide_tvb" without initializing it
+
++  tvbuff_t *wide_tvb = NULL;									// FIX_E02CFE60(1) #CWE-824 #Declare and initialize pointer "wide_tvb"
+
+ 
+
+   char *string;
+
+ 
+
+@@ -1512,6 +1512,8 @@
+
+                                             &wide_tvb);
+
+ 
+
+ #line 328 "x509sat.cnf"
+
++  if (!wide_tvb)										// FIX_E02CFE60(2) #CWE-824 #2 #Return if pointer "wide_tvb" is null
+
++    return offset;
+
+   string = tvb_get_ephemeral_faked_unicode (wide_tvb, 0, tvb_length(wide_tvb) / 2, FALSE);	// BUG_E02CFE60(2) FIX_E02CFE60(3) #CWE-824 #Use of potentially uninitialized pointer "wide_tvb"
+
+   proto_item_append_text(actx->created_item, " %s", string);	
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-yhoo.c
+--- 
+
++++ 
+
+@@ -192,7 +192,7 @@
+
+ 		return FALSE;
+
+ 	}
+
+ 
+
+-	if (memcmp(tvb_get_ptr(tvb, offset, 4) + tvb_length(tvb) * 10, "YPNS", 4) != 0 &&	// BUG_80FA3989(1) #CWE-823 #CWE-126 #Offset "tvb_length() * 10" can make the pointer returned by function "tvb_get_ptr" point out-of-range, leading to a buffer overread in function "memcmp"
+
++	if (memcmp(tvb_get_ptr(tvb, offset, 4), "YPNS", 4) != 0 &&				// FIX_80FA3989(1) #CWE-823 #CWE-126 #Function "tvb_get_ptr" returns a valid pointer, then properly read by "memcmp"
+
+ 	    memcmp(tvb_get_ptr(tvb, offset, 4), "YHOO", 4) != 0) {
+
+ 		/* Not a Yahoo Messenger packet. */
+
+ 		return FALSE;
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\epan\dissectors\packet-zrtp.c
+--- 
+
++++ 
+
+@@ -408,7 +408,7 @@
+
+   }
+
+ 
+
+   sent_crc = tvb_get_ntohl(tvb,msg_offset+checksum_offset);
+
+-  calc_crc = ~calculate_crc32c(tvb_get_ptr(tvb,0,msg_offset)+checksum_offset*10,msg_offset+checksum_offset,CRC32C_PRELOAD);	// BUG_61CF9E42(1) #CWE-823 #Adding offset "checksum_offset*10" to the pointer returned by function "tvb_get_ptr" can make it point out-of-bounds.
+
++  calc_crc = ~calculate_crc32c(tvb_get_ptr(tvb,0,msg_offset+checksum_offset),msg_offset+checksum_offset,CRC32C_PRELOAD);	// FIX_61CF9E42(1) #CWE-823 #Adding offset "checksum_offset" to the pointer returned by function "tvb_get_ptr" make it point at the right location.
+
+ 
+
+   if (sent_crc == calc_crc) {
+
+     ti = proto_tree_add_uint_format_value(zrtp_tree, hf_zrtp_checksum, tvb, msg_offset+checksum_offset, 4, sent_crc,
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\wiretap\catapult_dct2000.c
+--- 
+
++++ 
+
+@@ -806,9 +806,9 @@
+
+     *offset = *offset + *length;
+
+ 
+
+     /* ...but don't want to include newline in line length */
+
+-    if (linebuff[*length-1] == '\n')			// BUG_7394F5E6(3) #CWE-127 #"length" can be zero, so "linebuff" can be indexed by a negative value, causing a buffer underread
+
+-    {
+
+-        linebuff[*length-1] = '\0';			// BUG_7394F5E6(4) #CWE-124 #"length" can be zero, so "linebuff" can be indexed by a negative value, causing a buffer underwrite
+
++    if (*length > 0 && linebuff[*length-1] == '\n')	// FIX_7394F5E6(3) #CWE-127 #Check if "length" is at least 1
+
++    {
+
++        linebuff[*length-1] = '\0';			// FIX_7394F5E6(4) #CWE-124 #Write the null terminator at the proper place inside the buffer
+
+         *length = *length - 1;
+
+     }
+
+ 
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\wiretap\lanalyzer.c
+--- 
+
++++ 
+
+@@ -169,6 +169,7 @@
+
+ 	while (1) {
+
+ 		if (file_seek(wth->fh, record_length, SEEK_CUR, err) == -1) {
+
+ 			g_free(wth->capture.lanalyzer);						// BUG_5EA75897(2) FIX_5EA75897(2) #CWE-415 #Free "wth->catpure.lanalyzer" on this path
+
++			wth->capture.lanalyzer = NULL;						// FIX_5EA75897(3) #Reset pointer "wth->catpure.lanalyzer"
+
+ 			return -1;
+
+ 		}
+
+ 		wth->data_offset += record_length;
+
+@@ -179,9 +180,11 @@
+
+ 			*err = file_error(wth->fh);
+
+ 			if (*err != 0) {
+
+ 				g_free(wth->capture.lanalyzer);					// BUG_5EA75897(3) FIX_5EA75897(4) #CWE-415 #Free "wth->catpure.lanalyzer" on this path
+
++				wth->capture.lanalyzer = NULL;					// FIX_5EA75897(5) #Reset pointer "wth->catpure.lanalyzer"
+
+ 				return -1;
+
+ 			}
+
+ 			g_free(wth->capture.lanalyzer);						// BUG_5EA75897(4) FIX_5EA75897(6) #CWE-415 #Free "wth->catpure.lanalyzer" on this path
+
++			wth->capture.lanalyzer = NULL;						// FIX_5EA75897(7) #Reset pointer "wth->catpure.lanalyzer"
+
+ 			return 0;
+
+ 		}
+
+ 		wth->data_offset += 4;
+
+@@ -200,9 +203,11 @@
+
+ 					*err = file_error(wth->fh);
+
+ 					if (*err != 0) {
+
+ 						g_free(wth->capture.lanalyzer);			// BUG_5EA75897(5) FIX_5EA75897(8) #CWE-415 #Free "wth->catpure.lanalyzer" on this path
+
++						wth->capture.lanalyzer = NULL;			// FIX_5EA75897(9) #Reset pointer "wth->catpure.lanalyzer"
+
+ 						return -1;
+
+ 					}
+
+ 					g_free(wth->capture.lanalyzer);				// BUG_5EA75897(6) FIX_5EA75897(10) #CWE-415 #Free "wth->catpure.lanalyzer" on this path
+
++					wth->capture.lanalyzer = NULL;				// FIX_5EA75897(11) #Reset pointer "wth->catpure.lanalyzer"
+
+ 					return 0;
+
+ 				}
+
+ 				wth->data_offset += sizeof summary;
+
+@@ -246,6 +251,7 @@
+
+ 						break;
+
+ 					default:
+
+ 						g_free(wth->capture.lanalyzer);			// BUG_5EA75897(7) FIX_5EA75897(12) #CWE-415 #Free "wth->catpure.lanalyzer" on this path
+
++						wth->capture.lanalyzer = NULL;			// FIX_5EA75897(13) #Reset pointer "wth->catpure.lanalyzer"
+
+ 						*err = WTAP_ERR_UNSUPPORTED_ENCAP;
+
+ 						*err_info = g_strdup_printf("lanalyzer: board type %u unknown",
+
+ 						    board_type);
+
+@@ -259,6 +265,7 @@
+
+ 				 * can read this header */
+
+ 				if (file_seek(wth->fh, -bytes_read, SEEK_CUR, err) == -1) {
+
+ 					g_free(wth->capture.lanalyzer);				// BUG_5EA75897(8) FIX_5EA75897(14) #CWE-415 #Free "wth->catpure.lanalyzer" on this path
+
++					wth->capture.lanalyzer = NULL;				// FIX_5EA75897(15) #Reset pointer "wth->catpure.lanalyzer"
+
+ 					return -1;
+
+ 				}
+
+ 				wth->data_offset -= bytes_read;
+
+@@ -430,7 +437,10 @@
+
+ static void
+
+ lanalyzer_close(wtap *wth)
+
+ {
+
+-	g_free(wth->capture.lanalyzer);								// BUG_5EA75897(9) #CWE-415 #Free "wth->catpure.lanalyzer" possibly a second time
+
++	if(wth->capture.lanalyzer != NULL) {
+
++		g_free(wth->capture.lanalyzer);							// FIX_5EA75897(16) #CWE-415 #Free "wth->catpure.lanalyzer" only if the pointer is not null, indicating that the memory is still allocated
+
++		wth->capture.lanalyzer = NULL;
+
++	}
+
+ }
+
+ 
+
+ /*---------------------------------------------------
+
+C:/Users/Maxbe/Desktop/Capstone/wireshark-1.2-buggy\wiretap\pcapng.c
+--- 
+
++++ 
+
+@@ -251,6 +251,7 @@
+
+ 	/* XXX - currently don't know how to handle these! */
+
+ 	const union wtap_pseudo_header *pseudo_header;
+
+ 	const guchar *frame_buffer;
+
++	gsize allocated;
+
+ } wtapng_block_t;
+
+ 
+
+ typedef struct interface_data_s {
+
+@@ -724,14 +725,31 @@
+
+ 	              wblock->data.packet.cap_len,
+
+ 	              wblock->data.packet.interface_id);
+
+ 
+
+-
+
++	if (wblock->data.packet.cap_len > wblock->allocated) {						// FIX_8B973D84(7) #Limit capture size
+
++		*err = WTAP_ERR_BAD_RECORD;
+
++		*err_info = g_strdup_printf("pcapng_read_packet_block: cap_len %u is larger than %zu.",
+
++			wblock->data.packet.cap_len, wblock->allocated);
+
++		return 0;
+
++	}
+
++
+
++	if (wblock->data.packet.packet_len > WTAP_MAX_PACKET_SIZE) {					// FIX_3E6EE6AF(7) #Limit packet size
+
++		*err = WTAP_ERR_BAD_RECORD;
+
++		*err_info = g_strdup_printf("pcapng_read_packet_block: packet_len %u is larger than WTAP_MAX_PACKET_SIZE %u.",
+
++			wblock->data.packet.packet_len, WTAP_MAX_PACKET_SIZE);
+
++		return 0;
+
++	}
+
+ 
+
+ 
+
+ 	/* XXX - implement other linktypes then Ethernet */
+
+ 	/* (or even better share the code with libpcap.c) */
+
+ 
+
+-	/* Ethernet FCS length, might be overwritten by "per packet" options */
+
+-	((union wtap_pseudo_header *) wblock->pseudo_header)->eth.fcs_len = pn->if_fcslen;		// BUG_3E7D5A5F(1) #CWE-476 #"wblock->pseudo_header" can be null and is dereferenced
+
++	if(wblock->pseudo_header != NULL) {								// FIX_3E7D5A5F(1) #Check if "wblock->pseudo_header" is null before dereferencing it
+
++		/* Ethernet FCS length, might be overwritten by "per packet" options */
+
++		((union wtap_pseudo_header *) wblock->pseudo_header)->eth.fcs_len = pn->if_fcslen;	// FIX_3E7D5A5F(2) #CWE-476 #"wblock->pseudo_header" is not null and can be safely dereferenced
+
++	} else {
+
++		pcapng_debug0("pcapng_read_packet_block: null pointer dereference");
+
++		return block_read;
+
++	}
+
+ 
+
+ 	/* "(Enhanced) Packet Block" read capture data */
+
+ 	errno = WTAP_ERR_CANT_READ;
+
+@@ -856,7 +874,19 @@
+
+ 					     - (guint32)sizeof(pcapng_simple_packet_block_t) 
+
+ 					     - (guint32)sizeof(bh->block_total_length);
+
+ 
+
+-
+
++	if (wblock->data.simple_packet.cap_len > wblock->allocated) {						// FIX_8B973D84(10) #Limit capture size
+
++		*err = WTAP_ERR_BAD_RECORD;
+
++		*err_info = g_strdup_printf("pcapng_read_simple_packet_block: cap_len %u is larger than %zu.",
+
++			wblock->data.packet.cap_len, wblock->allocated);
+
++		return 0;
+
++	}
+
++
+
++	if (wblock->data.simple_packet.packet_len > WTAP_MAX_PACKET_SIZE) {				// FIX_3E6EE6AF(12) #Limit packet size
+
++		*err = WTAP_ERR_BAD_RECORD;
+
++		*err_info = g_strdup_printf("pcapng_read_simple_packet_block: packet_len %u is larger than WTAP_MAX_PACKET_SIZE %u.",
+
++			wblock->data.simple_packet.packet_len, WTAP_MAX_PACKET_SIZE);
+
++		return 0;
+
++	}
+
+ 
+
+ 	/*g_pcapng_debug1("pcapng_read_simple_packet_block: packet data: packet_len %u",
+
+ 			  wblock->data.simple_packet.packet_len);*/
+
+@@ -864,8 +894,13 @@
+
+ 	/* XXX - implement other linktypes then Ethernet */
+
+ 	/* (or even better share the code with libpcap.c) */
+
+ 
+
+-	/* Ethernet FCS length, might be overwritten by "per packet" options */
+
+-	((union wtap_pseudo_header *) wblock->pseudo_header)->eth.fcs_len = pn->if_fcslen;		// BUG_ED75DEF0(1) #CWE-476 #"wblock->pseudo_header" can be null and is dereferenced
+
++	if(wblock->pseudo_header != NULL) {								// FIX_ED75DEF0(1) #Check if "wblock->pseudo_header" is null before dereferencing it
+
++		/* Ethernet FCS length, might be overwritten by "per packet" options */
+
++		((union wtap_pseudo_header *) wblock->pseudo_header)->eth.fcs_len = pn->if_fcslen;	// FIX_ED75DEF0(2) #CWE-476 #"wblock->pseudo_header" is not null and can be safely dereferenced
+
++	} else {
+
++		pcapng_debug0("pcapng_read_packet_block: null pointer dereference");
+
++		return block_read;
+
++	}
+
+ 
+
+ 	/* "Simple Packet Block" read capture data */
+
+ 	errno = WTAP_ERR_CANT_READ;
+
+@@ -1130,6 +1165,7 @@
+
+ 	pn.number_of_interfaces = 0;
+
+ 
+
+ 	/* we don't expect any packet blocks yet */
+
++	wblock.allocated = 0;
+
+ 	wblock.frame_buffer = NULL;
+
+ 	wblock.pseudo_header = NULL;
+
+ 
+
+@@ -1188,6 +1224,8 @@
+
+ 	/* XXX - this probably won't work well with unlimited / per packet snapshot length */
+
+ 	buffer_assure_space(wth->frame_buffer, wth->snapshot_length);
+
+ 
+
++	buffer_assure_space(wth->frame_buffer, MAX(wth->snapshot_length, 1502));
+
++	wblock.allocated = buffer_length(wth->frame_buffer);
+
+ 	wblock.frame_buffer = buffer_start_ptr(wth->frame_buffer);
+
+ 	wblock.pseudo_header = &wth->pseudo_header;
+
+ 
+
+@@ -1260,6 +1298,7 @@
+
+ 	}
+
+ 	pcapng_debug1("pcapng_seek_read: reading at offset %" G_GINT64_MODIFIER "u", seek_off);
+
+ 
+
++	wblock.allocated = length;
+
+ 	wblock.frame_buffer = pd;
+
+ 	wblock.pseudo_header = pseudo_header;
+
+ 
+
