@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<AnalyzerReport parser_fw="resultparser" package_name="Wireshark-buggy" uuid="1aa6b007-11a9-4dba-9068-b9b89b6d8280" build_root_dir="/home/builder/build" parser_fw_version="3.1.8" tool_name="clang-sa" package_version="1.19999999999999995559" build_fw="c-assess" package_root_dir="pkg1" assess_fw_version="1.1.22" assessment_start_ts="1554836585.125511" assess_fw="c-assess" tool_version="3.8.0" platform_name="ubuntu-16.04-64" build_fw_version="1.1.22">
+  <BugInstance id="0">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>4380</StartLine>
+        <EndLine>4380</EndLine>
+        <StartColumn>12</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Use-after-free</BugCode>
+    <BugMessage>Use of memory after it is freed</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="1">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>1518</StartLine>
+        <EndLine>1518</EndLine>
+        <StartColumn>55</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Logic error</BugGroup>
+    <BugCode>Dereference of null pointer</BugCode>
+    <BugMessage>Access to field 'index' results in a dereference of a null pointer</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="2">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>1495</StartLine>
+        <EndLine>1495</EndLine>
+        <StartColumn>16</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Memory leak</BugCode>
+    <BugMessage>Potential memory leak</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="3">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>4884</StartLine>
+        <EndLine>4884</EndLine>
+        <StartColumn>12</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Use-after-free</BugCode>
+    <BugMessage>Use of memory after it is freed</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="4">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>888</StartLine>
+        <EndLine>888</EndLine>
+        <StartColumn>9</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Logic error</BugGroup>
+    <BugCode>Assigned value is garbage or undefined</BugCode>
+    <BugMessage>Assigned value is garbage or undefined</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="5">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>4545</StartLine>
+        <EndLine>4545</EndLine>
+        <StartColumn>11</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Use-after-free</BugCode>
+    <BugMessage>Use of memory after it is freed</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="6">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>1714</StartLine>
+        <EndLine>1714</EndLine>
+        <StartColumn>17</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>API</BugGroup>
+    <BugCode>Argument with 'nonnull' attribute passed null</BugCode>
+    <BugMessage>Null pointer passed as an argument to a 'nonnull' parameter</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="7">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>3442</StartLine>
+        <EndLine>3442</EndLine>
+        <StartColumn>7</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Dead store</BugGroup>
+    <BugCode>Dead initialization</BugCode>
+    <BugMessage>Value stored to 'lineno' during its initialization is never read</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="8">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/wireshark-1.2-buggy/tools/lemon/lemon.c</SourceFile>
+        <StartLine>2466</StartLine>
+        <EndLine>2466</EndLine>
+        <StartColumn>11</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Memory leak</BugCode>
+    <BugMessage>Potential leak of memory pointed to by 'sp'</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-04-09-140305-14880-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugSummary>
+    <BugCategory group="API" code="Argument with 'nonnull' attribute passed null" count="1" bytes="684" />
+    <BugCategory group="Dead store" code="Dead initialization" count="1" bytes="669" />
+    <BugCategory group="Logic error" code="Assigned value is garbage or undefined" count="1" bytes="661" />
+    <BugCategory group="Logic error" code="Dereference of null pointer" count="1" bytes="681" />
+    <BugCategory group="Memory Error" code="Memory leak" count="2" bytes="1264" />
+    <BugCategory group="Memory Error" code="Use-after-free" count="3" bytes="1902" />
+  </BugSummary>
+</AnalyzerReport>
