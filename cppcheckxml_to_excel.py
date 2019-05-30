@@ -7,7 +7,7 @@ from pandas import ExcelFile
 columns=['SourceFile','Bug Group','Bug Code','CWE ID','Bug Message','Build ID','AssesmentReportFile','Instance Location','Location ID','Primary','Explanation','StartLine','EndLine']
 index=range(0,13494)
 cppbugs=pd.DataFrame(index=index,columns=columns)
-DOMTree = xml.dom.minidom.parse("cppcheck.xml")
+DOMTree = xml.dom.minidom.parse("sql_cpp.xml")
 collection = DOMTree.documentElement
 bugs=collection.getElementsByTagName('BugInstance')
 rowcount=0
@@ -46,6 +46,6 @@ for bug in bugs:
             cppbugs.set_value(rowcount,'StartLine',startline)
             cppbugs.set_value(rowcount,'EndLine',endline)
             rowcount+=1
-xclwrite=ExcelWriter('cppbugs.xlsx')
+xclwrite=ExcelWriter('sql_cpp_bugs.xlsx')
 cppbugs.to_excel(xclwrite,'Sheet 1',index=True)
 xclwrite.save()

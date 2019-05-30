@@ -7,7 +7,7 @@ from pandas import ExcelFile
 columns=['SourceFile','Bug Group','Bug Code','Bug Severity','Bug Message','Build ID','AssesmentReportFile','Instance Location','Location ID','Primary','StartLine','EndLine']
 index=range(0,865)
 parasoftbugs=pd.DataFrame(index=index,columns=columns)
-DOMTree = xml.dom.minidom.parse("sql_sonar.xml")
+DOMTree = xml.dom.minidom.parse("sql_parasoft.xml")
 collection = DOMTree.documentElement
 bugs=collection.getElementsByTagName('BugInstance')
 rowcount=0
