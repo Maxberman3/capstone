@@ -1,8 +1,8 @@
 import pandas as pd
 from pandas import ExcelWriter,ExcelFile
 
-bugsdf=pd.read_excel('cppbugs.xlsx')
-truthdf=pd.read_excel('bugs_table.xlsx')
+bugsdf=pd.read_excel('sql_cpp_bugs.xlsx')
+truthdf=pd.read_excel('bugs_table_sql.xlsx')
 bugsdf['True Positive Flag']=0
 bugsdf['File Match Flag']=0
 for index,row in bugsdf.iterrows():
@@ -15,6 +15,6 @@ for index,row in bugsdf.iterrows():
             if line==truthrow['line']:
                 bugsdf.set_value(index,'True Positive Flag',1)
                 break
-writer=ExcelWriter('cppbugs-checked.xlsx')
+writer=ExcelWriter('cppbugs-checked-sql.xlsx')
 bugsdf.to_excel(writer,'sheet 1',index=False)
 writer.save()
