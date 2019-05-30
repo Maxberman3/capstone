@@ -7,7 +7,7 @@ from pandas import ExcelFile
 columns=['SourceFile','Bug Group','Bug Code','Bug Severity','Bug Message','Build ID','AssesmentReportFile','Instance Location','Location ID','Primary','StartLine','EndLine']
 index=range(0,865)
 parasoftbugs=pd.DataFrame(index=index,columns=columns)
-DOMTree = xml.dom.minidom.parse("parasoft.xml")
+DOMTree = xml.dom.minidom.parse("sql_sonar.xml")
 collection = DOMTree.documentElement
 bugs=collection.getElementsByTagName('BugInstance')
 rowcount=0
@@ -44,6 +44,6 @@ for bug in bugs:
             #     endline=location.getElementsByTagName('EndLine')[0].firstChild.nodeValue
             #     parasoftbugs.set_value(rowcount,'EndLine',endline)
             rowcount+=1
-xclwrite=ExcelWriter('parasoftbugs.xlsx')
+xclwrite=ExcelWriter('sql_sonar_bugs.xlsx')
 parasoftbugs.to_excel(xclwrite,'Sheet 1',index=True)
 xclwrite.save()

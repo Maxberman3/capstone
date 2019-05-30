@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<AnalyzerReport platform_name="ubuntu-16.04-64" build_fw="c-assess" parser_fw="resultparser" tool_version="3.8.0" build_fw_version="1.1.22" uuid="f599e10c-702a-4d3d-b1df-1141fbc9e11e" build_root_dir="/home/builder/build" package_root_dir="pkg1" assessment_start_ts="1559038443.919508" package_name="SQLite" assess_fw_version="1.1.22" package_version="3.20999999999999996447" assess_fw="c-assess" parser_fw_version="3.1.8" tool_name="clang-sa">
+  <BugInstance id="0">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>5431</StartLine>
+        <EndLine>5431</EndLine>
+        <StartColumn>12</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Use-after-free</BugCode>
+    <BugMessage>Use of memory after it is freed</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="1">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>5095</StartLine>
+        <EndLine>5095</EndLine>
+        <StartColumn>11</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Use-after-free</BugCode>
+    <BugMessage>Use of memory after it is freed</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="2">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>874</StartLine>
+        <EndLine>874</EndLine>
+        <StartColumn>10</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Logic error</BugGroup>
+    <BugCode>Dereference of null pointer</BugCode>
+    <BugMessage>Access to field 'lhs' results in a dereference of a null pointer (loaded from field 'startRule')</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="3">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>3216</StartLine>
+        <EndLine>3216</EndLine>
+        <StartColumn>30</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Logic error</BugGroup>
+    <BugCode>Dereference of null pointer</BugCode>
+    <BugMessage>Access to field 'statenum' results in a dereference of a null pointer (loaded from variable 'stp')</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="4">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>1039</StartLine>
+        <EndLine>1039</EndLine>
+        <StartColumn>13</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Logic error</BugGroup>
+    <BugCode>Dereference of null pointer</BugCode>
+    <BugMessage>Access to field 'cfp' results in a dereference of a null pointer (loaded from variable 'stp')</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="5">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>3419</StartLine>
+        <EndLine>3419</EndLine>
+        <StartColumn>6</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Memory leak</BugCode>
+    <BugMessage>Potential leak of memory pointed to by 'tpltname'</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="6">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>4927</StartLine>
+        <EndLine>4927</EndLine>
+        <StartColumn>12</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Memory Error</BugGroup>
+    <BugCode>Use-after-free</BugCode>
+    <BugMessage>Use of memory after it is freed</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="7">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>3832</StartLine>
+        <EndLine>3832</EndLine>
+        <StartColumn>7</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Dead store</BugGroup>
+    <BugCode>Dead initialization</BugCode>
+    <BugMessage>Value stored to 'lineno' during its initialization is never read</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="8">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/mkkeywordhash.c</SourceFile>
+        <StartLine>446</StartLine>
+        <EndLine>446</EndLine>
+        <StartColumn>33</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>Logic error</BugGroup>
+    <BugCode>Division by zero</BugCode>
+    <BugMessage>Division by zero</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugInstance id="9">
+    <Methods></Methods>
+    <BugLocations>
+      <Location id="1" primary="true">
+        <SourceFile>pkg1/sqlite-3.21-buggy/tool/lemon.c</SourceFile>
+        <StartLine>1868</StartLine>
+        <EndLine>1868</EndLine>
+        <StartColumn>11</StartColumn>
+      </Location>
+    </BugLocations>
+    <BugGroup>API</BugGroup>
+    <BugCode>Argument with 'nonnull' attribute passed null</BugCode>
+    <BugMessage>Null pointer passed as an argument to a 'nonnull' parameter</BugMessage>
+    <BugTrace>
+      <BuildId>1</BuildId>
+      <AssessmentReportFile>clang-sa_results1/2019-05-28-051404-3864-1</AssessmentReportFile>
+    </BugTrace>
+  </BugInstance>
+  <BugSummary>
+    <BugCategory group="API" code="Argument with 'nonnull' attribute passed null" count="1" bytes="674" />
+    <BugCategory group="Dead store" code="Dead initialization" count="1" bytes="659" />
+    <BugCategory group="Logic error" code="Dereference of null pointer" count="3" bytes="2100" />
+    <BugCategory group="Logic error" code="Division by zero" count="1" bytes="616" />
+    <BugCategory group="Memory Error" code="Memory leak" count="1" bytes="638" />
+    <BugCategory group="Memory Error" code="Use-after-free" count="3" bytes="1872" />
+  </BugSummary>
+</AnalyzerReport>
