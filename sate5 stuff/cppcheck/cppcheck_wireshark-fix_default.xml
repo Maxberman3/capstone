@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" tool_name="cppcheck" tool_version="1.60">
+	<!--
+		Report for "wireshark-fix" with evaluations by SATE analysts
+		Date: Tue, 23 Oct 2018 18:17:50 GMT
+		SATE V
+	-->
+	<weakness id="1" uid="209132" selected="no">
+		<name cweid="398">uselessAssignmentPtrArg</name>
+		<location id="0" path="wireshark-1.8.7/epan/dissectors/dcerpc/idl2wrs.c" line="246"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Assignment of function parameter has no effect outside the function.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="2" uid="209133" selected="no">
+		<name cweid="125">insecureCmdLineArgs</name>
+		<location id="0" path="wireshark-1.8.7/epan/dissectors/dcerpc/idl2wrs.c" line="3191"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Buffer overrun possible for long command line arguments.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="3" uid="209134" selected="no">
+		<name cweid="401">memleak</name>
+		<location id="0" path="wireshark-1.8.7/epan/dissectors/dcerpc/idl2wrs.c" line="1831"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: ptmpstr
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="4" uid="209135" selected="no">
+		<name cweid="401">memleak</name>
+		<location id="0" path="wireshark-1.8.7/epan/dissectors/dcerpc/idl2wrs.c" line="2403"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: ptmpstr
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="5" uid="209136" selected="no">
+		<name cweid="401">memleak</name>
+		<location id="0" path="wireshark-1.8.7/epan/dissectors/dcerpc/idl2wrs.c" line="2700"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: ptmpstr
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="6" uid="209137" selected="no">
+		<name cweid="398">uselessAssignmentPtrArg</name>
+		<location id="0" path="wireshark-1.8.7/packaging/macosx/ScriptExec/main.c" line="642"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Assignment of function parameter has no effect outside the function.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="7" uid="209138" selected="no">
+		<name cweid="170">uninitstring</name>
+		<location id="0" path="wireshark-1.8.7/packaging/u3/win32/u3util.c" line="500"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Dangerous usage of 'dir_spec' (strncpy doesn't always null-terminate it).
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="8" uid="209139" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="wireshark-1.8.7/plugins/mate/mate_util.c" line="1554"/>
+		<location id="0" path="wireshark-1.8.7/plugins/mate/mate_util.c" line="1547"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: loal - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="9" uid="209140" selected="no">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="wireshark-1.8.7/tools/lemon/lemon.c" line="3296"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'z' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="10" uid="209141" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="wireshark-1.8.7/ui/qt/recent_file_status.cpp" line="30"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'RecentFileStatus::m_size' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+</report>

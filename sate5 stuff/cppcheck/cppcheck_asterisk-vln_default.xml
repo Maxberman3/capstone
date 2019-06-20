@@ -1,0 +1,1209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" tool_name="cppcheck" tool_version="1.60">
+	<!--
+		Report for "asterisk-vln" with evaluations by SATE analysts
+		Date: Tue, 23 Oct 2018 18:17:50 GMT
+		SATE V
+	-->
+	<weakness id="3" uid="209025" selected="yes">
+		<name cweid="401">memleak</name>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/memheap.c" line="191"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: pMemLink
+]]></textoutput>
+		</output>
+		<evaluation correctness="false">
+			<comments><![CDATA[<ol><li>The relevant code is<br/>179 data = malloc (nbytes);<br/>183 pMemLink = memHeapAddBlock (ppMemLink, data, RTMEMMALLOC | RTMEMRAW);<br/>191 return data;<br/>(Not shown is code to check for allocation failures and do other stuff.)<br/>Relevant code in memheap.c is<br/>1207 static OSMemLink* memHeapAddBlock(OSMemLink** ppMemLink, void* pMemBlk, ...)	<br/>1219 pMemLink = (OSMemLink*) malloc ( ...<br/>1229 pMemLink-&gt;pMemBlk = pMemBlk; // save address which is in data<br/>1248 ((OSMemBlk*)pMemBlk)-&gt;plink = pMemLink; // put address of allocated space in data&#039;s area<br/>I can see where it looks like the pointer in pMemLink is lost, but it is clear one can get back to the pMemLink area through the data pointer. I&#039;m guessing that the memory is handled properly.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="40" uid="209062" selected="yes">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="asterisk-10.2.0/channels/h323/compat_h323.h" line="34"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'MyH323TransportUDP::discoverAddress' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+		<evaluation correctness="insignificant">
+			<comments><![CDATA[<ol><li>Several of the member variables are not initialized.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="51" uid="209073" selected="yes">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1988"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>1950     pSps=pChan-&gt;spsSigGen1=createPmrSps(pChan);<br/>1951     pSps-&gt;sink=pChan-&gt;pSigGen1;<br/>... MANY more initializations ...<br/>2008     if(pSps==NULL)printf(&quot;Error: calloc(), createPmrChannel()\n&quot;);<br/>The relevant code in createPmrSps() is<br/>2490     pSps = (t_pmr_sps *)calloc(sizeof(t_pmr_sps),1);<br/>2492     if(!pSps)printf(&quot;Error: createPmrSps()\n&quot;);<br/>2494     pSps-&gt;parentChan=pChan;<br/>2499     return pSps;<br/>There is no controlled abort() if calloc() fails.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="73" uid="209095" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/history.c" line="626"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'ptr' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>615 ptr = h_malloc(max_size = 1024);<br/>626 . . ptr = h_realloc(ptr, max_size);<br/>where h_realloc() just renames realloc().  The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost.<br/><br/>Worse yet, there is no check for failure.  In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="74" uid="209096" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/history.c" line="664"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'ptr' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>664             ptr = h_realloc(ptr, max_size);<br/>where h_realloc() just renames realloc(). The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="75" uid="209097" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="354"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'result' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>354                 result = realloc(result, size);<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="76" uid="209098" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="365"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'result' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>365                 result = realloc(result, size);<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="77" uid="209099" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="540"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'what' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>540                         what = realloc(what,<br/>541 . . . .               (size &lt;&lt;= 1));</li>
+
+<li>540 what = realloc(what, <br/>541 . . . . (size &lt;&lt;= 1));<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.<br/><br/>(I hit submit before adding the explanation.)</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="78" uid="209100" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="566"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'with' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>566                         with = realloc(with, size);<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="79" uid="209101" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="731"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'result' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>731         ADD_STRING(temp, len);<br/>where the code in ADD_STRING is<br/>685 . . .             result = realloc(result, (size += len + 1));<br/>The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. </li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="80" uid="209102" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="737"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'result' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>737             ADD_STRING(temp, len);<br/>where the code in ADD_STRING is <br/>685 . . . result = realloc(result, (size += len + 1)); <br/>The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="81" uid="209103" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="748"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'result' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>748             ADD_STRING(temp, len);<br/>where the code in ADD_STRING is <br/>685 . . . result = realloc(result, (size += len + 1)); <br/>The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="82" uid="209104" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="800"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'result' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>800             result = realloc(result, size * sizeof(char *));<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="83" uid="209105" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="1214"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'dirname' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>1214         dirname = realloc(dirname, len + 1);<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="84" uid="209106" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="1225"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'dirname' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>1225         dirname = realloc(dirname, strlen(temp) + 1);<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="85" uid="209107" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="1337"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'match_list' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>1337             match_list = realloc(match_list,<br/>1338 . .                 match_list_len * sizeof(char *));<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="86" uid="209108" selected="yes">
+		<name cweid="401">memleakOnRealloc</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="1364"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Common realloc mistake: 'match_list' nulled but not freed upon failure
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>1364         match_list = realloc(match_list,<br/>1365 . .             (match_list_len + 1) * sizeof(char *));<br/>is the relevant code. The analysis is correct: if reallocation fails, realloc() returns NULL, and the previously allocated area is lost. <br/><br/>Worse yet, there is no check for failure. In other words, if realloc() fails, the program just crashes.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="87" uid="209109" selected="yes">
+		<name cweid="401">memleak</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/readline.c" line="1272"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: filename
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Some relevant code is<br/>1202     char *filename = NULL<br/>1209     if (temp) {<br/>1211 . . filename = realloc(filename, strlen(temp) + 1);<br/>1217     } else {<br/>1218 . .         filename = strdup(text);<br/>1220     }<br/>1230     filename_len = strlen(filename);<br/>1246 . .        &amp;&amp; strncmp(entry-&gt;d_name, filename,<br/>Indeed, filename is allocated, but not freed. The only reference to the space (through filename) is lost when the the function ends.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="88" uid="209110" selected="yes">
+		<name cweid="401">memleak</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/term.c" line="485"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: b
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Some relevant code is<br/>476     char **b;<br/>479     b = (char **) el_malloc((size_t) (sizeof(char *) * (c-&gt;v + 1)));<br/>483 . .    b[i] = (char *) el_malloc((size_t) (sizeof(char) * (c-&gt;h + 1)));<br/>484 . .      if (b[i] == NULL)<br/>485  . . . .     return (-1);<br/>An array (of strings) is allocated, then strings are allocated and put into the array. However, if allocation of one of the arrays fails, previous allocated memory is not freed.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="89" uid="209111" selected="yes">
+		<name cweid="401">memleak</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/tokenizer.c" line="117"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: tok
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Possibly relevant code is<br/>110     Tokenizer *tok = (Tokenizer *) tok_malloc(sizeof(Tokenizer));<br/>116     if (tok-&gt;argv == NULL)<br/>117 . .        return (NULL);<br/>If the second allocation (line 116) fails, the memory allocated in line 110 is lost.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="90" uid="209112" selected="yes">
+		<name cweid="401">memleak</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/tokenizer.c" line="121"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: tok
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>110     Tokenizer *tok = (Tokenizer *) tok_malloc(sizeof(Tokenizer));<br/>119     tok-&gt;wspace = (char *) tok_malloc(WINCR);<br/>120     if (tok-&gt;wspace == NULL)<br/>121 . .         return (NULL);<br/>If the allocation of wspace (line 119) fails, the memory allocated at line 110 is lost.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="91" uid="209113" selected="yes">
+		<name cweid="401">memleak</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/tokenizer.c" line="117"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: tok.ifs
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>112     tok-&gt;ifs = strdup(ifs ? ifs : IFS);<br/>115     tok-&gt;argv = (char **) tok_malloc(sizeof(char *) * tok-&gt;amax);<br/>116     if (tok-&gt;argv == NULL)<br/>117  . .       return (NULL);<br/>If the later allocation fails, the memory allocated at line 112 is lost.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="92" uid="209114" selected="yes">
+		<name cweid="401">memleak</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/tokenizer.c" line="121"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: tok.argv
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>115     tok-&gt;argv = (char **) tok_malloc(sizeof(char *) * tok-&gt;amax);<br/>116     if (tok-&gt;argv == NULL)<br/>117 . .         return (NULL);<br/>118     tok-&gt;argv[0] = NULL;<br/>119     tok-&gt;wspace = (char *) tok_malloc(WINCR);<br/>120     if (tok-&gt;wspace == NULL)<br/>121 . .         return (NULL);<br/>If the allocation at line 119 fails, then the memory allocated at line 115 is lost.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="94" uid="209116" selected="yes">
+		<name cweid="398">uselessAssignmentPtrArg</name>
+		<location id="0" path="asterisk-10.2.0/main/ulaw.c" line="129"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Assignment of function parameter has no effect outside the function.
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>098 static unsigned char linear2ulaw(short sample, int full_coding)<br/>099 {<br/>125     sign = (sample &gt;&gt; 8) &amp; 0x80;<br/>126     if (sign != 0) <br/>127    . .      sample = -sample;<br/>128     if (sample &gt; CLIP)<br/>129 . .         sample = CLIP;<br/>The variable &quot;sample&quot; is never used again. I don&#039;t see any macros. Surrounding this is a conditional compilation:<br/>045 #ifndef G711_NEW_ALGORITHM<br/>050 static unsigned char linear2ulaw(short sample)<br/>091 }<br/>093 #else<br/>098 static unsigned char linear2ulaw(short sample, int full_coding)<br/>Perhaps the buggy code is never used anymore. Our version 11 has the same useless code.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="96" uid="209118" selected="yes">
+		<name cweid="119,676">invalidscanf</name>
+		<location id="0" path="asterisk-10.2.0/menuselect/menuselect.c" line="802"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[scanf without field width limits can crash with huge input data on libc versions older than 2.13-25. Add a field width specifier to fix this problem:
+    %i => %3i
+
+Sample program that can crash:
+
+#include <stdio.h>
+int main()
+{
+    int a;
+    scanf("%i", &a);
+    return 0;
+}
+
+To make it crash:
+perl -e 'print "5"x2100000' | ./a.out
+]]></textoutput>
+		</output>
+		<evaluation correctness="insignificant">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>802             if (sscanf(prev, &quot;%d&quot;, &amp;val) != 1) {<br/>Since this is reading a config file and the problem occurs rarely, I marked this insignificant.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="99" uid="209121" selected="yes">
+		<name cweid="170">uninitstring</name>
+		<location id="0" path="asterisk-10.2.0/utils/astman.c" line="554"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Dangerous usage of 'channame' (strncpy doesn't always null-terminate it).
+]]></textoutput>
+		</output>
+		<evaluation correctness="false">
+			<comments><![CDATA[<ol><li>The immediately relevant code is<br/>544     struct ast_chan *chan;<br/>547     char channame[256];<br/>553 . . strncpy(channame, chan-&gt;name, sizeof(channame) - 1);<br/>It turns out that the structure ast_chan is defined in lines 79 through 87 of the same file:<br/>79 struct ast_chan {<br/>80 . .     char name[80];<br/> . . .<br/>87 };<br/>So ASSUMING that strings fit within the 80 character buffer in the structure, there is no chance of reaching the limit. In other words, channame will always be null-terminated. <br/><br/>Of course, if it always succeeds, why use strncpy() instead of strcpy()??</li>
+
+<li>Additional information to clarify the preceding evaluation: the warning was actually for the next line, where channame is used:<br/>554 . . snprintf(tmp, sizeof(tmp), &quot;Enter new extension for %s&quot;, channame);<br/></li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="105" uid="209127" selected="yes">
+		<name cweid="170">uninitstring</name>
+		<location id="0" path="asterisk-10.2.0/utils/db1-ast/hash/ndbm.c" line="83"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Dangerous usage of 'path' (strncpy doesn't always null-terminate it).
+]]></textoutput>
+		</output>
+		<evaluation correctness="false">
+			<comments><![CDATA[<ol><li>Pertinent code is<br/>67    const size_t len = strlen(file) + sizeof (DBM_SUFFIX);<br/>68 #ifdef __GNUC__<br/>69     char path[len];<br/>70 #else<br/>71     char *path = malloc(len);<br/>72     if (path == NULL)<br/>73 . .         return NULL;<br/>74 #endif<br/><br/>82     (void)strncpy(path, file, len - 1);<br/>83     (void)strncat(path, DBM_SUFFIX, len - strlen(path) - 1);<br/>where<br/>#define 	DBM_SUFFIX   &quot;.db&quot;<br/><br/>Line 67 finds the length of file and the SIZEOF the string DBM_SUFFIX, which includes a null. So the allocated size is always big enough to contain file. (But since that&#039;s the case, why use strncpy() and strncat() instead of the faster strcpy() and strcat()??)</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="106" uid="209128" selected="yes">
+		<name cweid="398">syntaxError</name>
+		<location id="0" path="asterisk-10.2.0/utils/db1-ast/recno/rec_open.c" line="170"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Invalid number of character (() when these macros are defined: 'MMAP_NOT_AVAILABLE'.
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>The relevant code is<br/>170                 if ((t-&gt;bt_smap = mmap(NULL, t-&gt;bt_msize,<br/>171 . .                     PROT_READ, MAP_PRIVATE, rfd,<br/>172    . .                 (off_t)0)) == MAP_FAILED<br/>173       . .              goto slow;<br/>Clearly there should be a trailing parenthesis after MAP_FAILED. A preceding comment says,<br/>164                  * Mmap doesn&#039;t work correctly on many current<br/>165                  * systems.  In particular, it can fail subtly,<br/>166                  * with cache coherency problems.  Don&#039;t use it<br/>167                  * for now.<br/></li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="107" uid="209129" selected="yes">
+		<name cweid="401">memleak</name>
+		<location id="0" path="asterisk-10.2.0/utils/extconf.c" line="5178"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Memory leak: ignorepat
+]]></textoutput>
+		</output>
+		<evaluation correctness="quality">
+			<comments><![CDATA[<ol><li>Relevant memory is<br/>5165     if (!(ignorepat = ast_calloc(1, length)))<br/>5166 . .         return -1;<br/> . . .<br/>5175 . .         if (!strcasecmp(ignorepatc-&gt;pattern, value)) {<br/> . . .<br/>05178             return -1;<br/>In this case, the memory allocated at line 5165 is lost.</li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="109" uid="209131" selected="yes">
+		<name cweid="416">useClosedFile</name>
+		<location id="0" path="asterisk-10.2.0/utils/muted.c" line="755"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Used file that is not opened.
+]]></textoutput>
+		</output>
+		<evaluation correctness="false">
+			<comments><![CDATA[<ol><li>Relevant code is<br/>751             while(connect_asterisk()) {<br/>752 . .                 sleep(5);<br/>753             }<br/>754             if (login_asterisk()) {<br/>755                 fclose(astf);<br/>astf is a global variable. It is opened in connect_asterisk():<br/>251     astf = fdopen(sock, &quot;r+&quot;);<br/>252     if (!astf) {<br/>253 . .         fprintf(stderr, &quot;fdopen failed: %s\n&quot;, strerror(errno));<br/>254 . .         close(sock);<br/>255 . .        return -1;<br/>256     }<br/>257     return 0;<br/></li>
+
+</ol>]]></comments>
+		</evaluation>
+	</weakness>
+	<weakness id="1" uid="209023" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/encode.c" line="578"/>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/encode.c" line="565"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pvalue - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="2" uid="209024" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/memheap.c" line="1067"/>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/memheap.c" line="1065"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: ppMemHeap - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="4" uid="209026" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/ooCalls.c" line="803"/>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/ooCalls.c" line="806"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: call - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="5" uid="209027" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/ooCapability.c" line="813"/>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/ooCapability.c" line="812"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: events - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="6" uid="209028" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/ooGkClient.c" line="2299"/>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/ooGkClient.c" line="2297"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: perCallInfo - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="7" uid="209029" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/ooh245.c" line="360"/>
+		<location id="0" path="asterisk-10.2.0/addons/ooh323c/src/ooh245.c" line="359"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: request - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="8" uid="209030" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/contain.h" line="481"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Reference::size' is not assigned a value in 'Reference::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="9" uid="209031" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/contain.h" line="481"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Reference::deleteObjects' is not assigned a value in 'Reference::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="10" uid="209032" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/lists.h" line="396"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Info::lastIndex' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="11" uid="209033" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/dict.h" line="366"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Table::lastIndex' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="12" uid="209034" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/dict.h" line="366"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Table::lastBucket' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="13" uid="209035" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/dict.h" line="366"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Table::lastElement' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="14" uid="209036" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/dict.h" line="366"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Table::deleteKeys' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="15" uid="209037" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::autoDelete' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="16" uid="209038" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::threadName' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="17" uid="209039" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::traceBlockIndentLevel' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="18" uid="209040" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::PX_origStackSize' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="19" uid="209041" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::PX_priority' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="20" uid="209042" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::PX_suspendCount' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="21" uid="209043" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::PX_firstTimeStart' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="22" uid="209044" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::unblockPipe' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="23" uid="209045" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/semaphor.h" line="210"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PSemaphore::initialVar' is not assigned a value in 'PSemaphore::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="24" uid="209046" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/semaphor.h" line="210"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PSemaphore::maxCountVar' is not assigned a value in 'PSemaphore::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="25" uid="209047" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/semaphor.h" line="210"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PSemaphore::pxClass' is not assigned a value in 'PSemaphore::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="26" uid="209048" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/pfactory.h" line="201"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PFactoryBase::mutex' is not assigned a value in 'PFactoryBase::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="27" uid="209049" selected="no">
+		<name cweid="398">syntaxError</name>
+		<location id="0" path="/usr/include/ptlib/object.h" line="1361"/>
+		<grade severity="1"/>
+		<output>
+			<textoutput><![CDATA[Invalid number of character ({) when these macros are defined: 'DOC_PLUS_PLUS'.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="28" uid="209050" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/contain.h" line="464"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Reference::critSec' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="29" uid="209051" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/contain.h" line="481"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'Reference::critSec' is not assigned a value in 'Reference::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="30" uid="209052" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/object.h" line="1712"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PInt16b::data' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="31" uid="209053" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/object.h" line="1736"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PInt32b::data' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="32" uid="209054" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/object.h" line="1784"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PFloat32b::data' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="33" uid="209055" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/object.h" line="1796"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PFloat64b::data' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="34" uid="209056" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="/usr/include/ptlib/object.h" line="1809"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PFloat80b::data' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="35" uid="209057" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/thread.h" line="479"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PThread::originalStackSize' is not assigned a value in 'PThread::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="36" uid="209058" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/semaphor.h" line="210"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PSemaphore::initialVal' is not assigned a value in 'PSemaphore::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="37" uid="209059" selected="no">
+		<name cweid="398">operatorEqVarError</name>
+		<location id="0" path="/usr/include/ptlib/semaphor.h" line="210"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'PSemaphore::maxCountVal' is not assigned a value in 'PSemaphore::operator='.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="38" uid="209060" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="asterisk-10.2.0/channels/h323/compat_h323.h" line="34"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'MyH323TransportUDP::discoverGatekeeper' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="39" uid="209061" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="asterisk-10.2.0/channels/h323/compat_h323.h" line="34"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'MyH323TransportUDP::discoverPDU' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="41" uid="209063" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="asterisk-10.2.0/channels/h323/compat_h323.h" line="34"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'MyH323TransportUDP::discoverResult' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="42" uid="209064" selected="no">
+		<name cweid="398,665">uninitMemberVar</name>
+		<location id="0" path="asterisk-10.2.0/channels/h323/compat_h323.h" line="34"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Member variable 'MyH323TransportUDP::discoverReady' is not initialized in the constructor.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="43" uid="209065" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/misdn/isdn_lib.c" line="1999"/>
+		<location id="0" path="asterisk-10.2.0/channels/misdn/isdn_lib.c" line="1997"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: hold_bc - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="44" uid="209066" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/misdn/isdn_lib.c" line="4707"/>
+		<location id="0" path="asterisk-10.2.0/channels/misdn/isdn_lib.c" line="4706"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: stack - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="45" uid="209067" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1982"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="46" uid="209068" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1983"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="47" uid="209069" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1984"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="48" uid="209070" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1985"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="49" uid="209071" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1986"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="50" uid="209072" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1987"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="52" uid="209074" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1989"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="53" uid="209075" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1990"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="54" uid="209076" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1991"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="55" uid="209077" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1992"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="56" uid="209078" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1995"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="57" uid="209079" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1996"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="58" uid="209080" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1997"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="59" uid="209081" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1998"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="60" uid="209082" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1999"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="61" uid="209083" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2000"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="62" uid="209084" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2001"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="63" uid="209085" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2003"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="64" uid="209086" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2008"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2004"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="65" uid="209087" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2526"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2516"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pChan - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="66" uid="209088" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2104"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2103"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="67" uid="209089" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2130"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2129"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="68" uid="209090" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2216"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2215"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="69" uid="209091" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2243"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2242"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="70" uid="209092" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2330"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2329"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="71" uid="209093" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2381"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="2380"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: pSps - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="72" uid="209094" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1656"/>
+		<location id="0" path="asterisk-10.2.0/channels/xpmr/xpmr.c" line="1653"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: tChan - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="93" uid="209115" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/main/editline/tty.c" line="1057"/>
+		<location id="0" path="asterisk-10.2.0/main/editline/tty.c" line="1055"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: argv - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="95" uid="209117" selected="no">
+		<name cweid="119,676">invalidscanf</name>
+		<location id="0" path="asterisk-10.2.0/menuselect/menuselect.c" line="786"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[scanf without field width limits can crash with huge input data on libc versions older than 2.13-25. Add a field width specifier to fix this problem:
+    %i => %3i
+
+Sample program that can crash:
+
+#include <stdio.h>
+int main()
+{
+    int a;
+    scanf("%i", &a);
+    return 0;
+}
+
+To make it crash:
+perl -e 'print "5"x2100000' | ./a.out
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="97" uid="209119" selected="no">
+		<name cweid="476">nullPointer</name>
+		<location id="0" path="asterisk-10.2.0/utils/astman.c" line="715"/>
+		<location id="0" path="asterisk-10.2.0/utils/astman.c" line="741"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Possible null pointer dereference: m - otherwise it is redundant to check it against null.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="98" uid="209120" selected="no">
+		<name cweid="467">pointerSize</name>
+		<location id="0" path="asterisk-10.2.0/utils/astman.c" line="741"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[Size of pointer 'm' used instead of size of its data. This is likely to lead to a buffer overflow. You probably intend to write 'sizeof(*m)'.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="100" uid="209122" selected="no">
+		<name cweid="686">invalidPrintfArgType_sint</name>
+		<location id="0" path="asterisk-10.2.0/utils/db1-ast/btree/bt_debug.c" line="189"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[%d in format string (no. 3) requires a signed integer given in the argument list.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="101" uid="209123" selected="no">
+		<name cweid="686">invalidPrintfArgType_sint</name>
+		<location id="0" path="asterisk-10.2.0/utils/db1-ast/btree/bt_debug.c" line="192"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[%d in format string (no. 1) requires a signed integer given in the argument list.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="102" uid="209124" selected="no">
+		<name cweid="686">invalidPrintfArgType_sint</name>
+		<location id="0" path="asterisk-10.2.0/utils/db1-ast/hash/hash_page.c" line="826"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[%d in format string (no. 1) requires a signed integer given in the argument list.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="103" uid="209125" selected="no">
+		<name cweid="686">invalidPrintfArgType_sint</name>
+		<location id="0" path="asterisk-10.2.0/utils/db1-ast/hash/hash_page.c" line="775"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[%d in format string (no. 1) requires a signed integer given in the argument list.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="104" uid="209126" selected="no">
+		<name cweid="686">invalidPrintfArgType_sint</name>
+		<location id="0" path="asterisk-10.2.0/utils/db1-ast/hash/hash_page.c" line="803"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[%d in format string (no. 1) requires a signed integer given in the argument list.
+]]></textoutput>
+		</output>
+	</weakness>
+	<weakness id="108" uid="209130" selected="no">
+		<name cweid="686">invalidPrintfArgType_sint</name>
+		<location id="0" path="asterisk-10.2.0/utils/frame.c" line="116"/>
+		<grade severity="5"/>
+		<output>
+			<textoutput><![CDATA[%d in format string (no. 2) requires a signed integer given in the argument list.
+]]></textoutput>
+		</output>
+	</weakness>
+</report>

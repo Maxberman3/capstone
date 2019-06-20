@@ -1,8 +1,9 @@
 import difflib
+import pathlib
 import os
 
-buggypath='C:/Users/Maxbe/Desktop/Capstone/sqlite-3.21-sate6/sqlite-3.21-buggy'
-cleanpath='C:/Users/Maxbe/Desktop/Capstone/sqlite-3.21-sate6/sqlite-3.21-fixed'
+buggypath='C:/Users/Maxbe/Desktop/Capstone/dspace-6.2-sate6/dspace-6.2-buggy'
+cleanpath='C:/Users/Maxbe/Desktop/Capstone/dspace-6.2-sate6/dspace-6.2-fixed'
 buggyfilelist=[]
 cleanfilelist=[]
 for root, directories, filesnames in os.walk(buggypath):
@@ -21,10 +22,10 @@ diffs=[]
 filepathlist=[]
 for bugfilepth,cleanfilepth in both:
     name,ext=os.path.splitext(bugfilepth)
-    if ext in ['.py','.h','.c','.cpp','.xml','.html','.sh']:
-        print(bugfilepth)
-        if bugfilepth == 'C:/Users/Maxbe/Desktop/Capstone/sqlite-3.21-sate6/sqlite-3.21-buggy\ext\misc\spellfix.c':
-            continue
+    if ext in ['.py','.h','.c','.cpp','.xml','.html','.sh','.java','.class']:
+        # print(bugfilepth)
+        # if bugfilepth == 'C:/Users/Maxbe/Desktop/Capstone/sqlite-3.21-sate6/sqlite-3.21-buggy\ext\misc\spellfix.c':
+        #     continue
         bugfile=open(bugfilepth).readlines()
         cleanfile=open(cleanfilepth).readlines()
         linelist=list(difflib.unified_diff(bugfile,cleanfile))
@@ -42,6 +43,6 @@ for path,diff in diffandpath:
             diffstring+=line
             diffstring+='\n'
 # print(diffstring)
-diffile=open('diffile3.txt','w')
+diffile=open('diffile4.txt','w')
 diffile.write(diffstring)
 diffile.close()
