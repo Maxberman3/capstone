@@ -6,3 +6,9 @@ cb-multios/*
 cgc-sate6/*
 guifeedbacktool.docx
 dspace-6.2-sate6/*
+AL_result/*
+label_idx.txt
+multi_thread_state.pkl
+test_idx.txt
+train_idx.txt
+unlabel_idx.txt
