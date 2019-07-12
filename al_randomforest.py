@@ -5,18 +5,18 @@ from alipy.experiment import ExperimentAnalyser
 from sklearn.ensemble import RandomForestClassifier
 
 def encode_and_bind(original_dataframe, feature_to_encode):
-    res = pd.concat([original_dataframe, pd.get_dummies(original_dataframe[feature_to_encode],prefix=[feature_to_encode],dummy_na=True)], axis=1)
+    res = pd.concat([original_dataframe, pd.get_dummies(original_dataframe[feature_to_encode],prefix=feature_to_encode)], axis=1)
     res.drop(columns=[feature_to_encode],axis=1,inplace=True)
     return(res)
-    
+
 df=pd.read_excel('Juliet_Test_Suite/combined_data_table.xlsx')
 df=encode_and_bind(df,'Clang Rule')
 df=encode_and_bind(df,'CodeSonar Rule')
 df=encode_and_bind(df,'Severity')
 df=encode_and_bind(df,'CWE')
 df = df[np.isfinite(df['True Positive'])]
-X=df.iloc[:,:-1]
-y=df.iloc[:,-1]
+X=df.drop('True Positive',axis=1)
+y=df.loc[:,'True Positive']
 al_unc=AlExperiment(X,y,model=RandomForestClassifier(n_estimators=100),performance_metric='accuracy_score',stopping_criteria='num_of_queries', stopping_value=300)
 al_unc.split_AL(test_ratio=0.2,initial_label_rate=0.0005,split_count=1,all_class=False)
 al_unc.set_query_strategy(strategy='QueryInstanceUncertainty')

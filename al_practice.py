@@ -5,7 +5,7 @@ from alipy.experiment import ExperimentAnalyser
 from sklearn.linear_model import LogisticRegression
 
 def encode_and_bind(original_dataframe, feature_to_encode):
-    res = pd.concat([original_dataframe, pd.get_dummies(original_dataframe[feature_to_encode],prefix=[feature_to_encode],dummy_na=True)], axis=1)
+    res = pd.concat([original_dataframe, pd.get_dummies(original_dataframe[feature_to_encode],prefix=feature_to_encode)], axis=1)
     res.drop(columns=[feature_to_encode],axis=1,inplace=True)
     return(res)
 
@@ -15,8 +15,8 @@ df=encode_and_bind(df,'CodeSonar Rule')
 df=encode_and_bind(df,'Severity')
 df=encode_and_bind(df,'CWE')
 df = df[np.isfinite(df['True Positive'])]
-X=df.iloc[:,:-1]
-y=df.iloc[:,-1]
+X=df.drop('True Positive',axis=1)
+y=df.loc[:,'True Positive']
 al_unc=AlExperiment(X,y,model=LogisticRegression(penalty='l1',solver='liblinear'),performance_metric='accuracy_score',stopping_criteria='num_of_queries', stopping_value=300)
 al_unc.split_AL(test_ratio=0.2,initial_label_rate=0.005,split_count=5,all_class=True)
 al_unc.set_query_strategy(strategy='QueryInstanceUncertainty')

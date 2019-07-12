@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 
 def encode_and_bind(original_dataframe, feature_to_encode):
-    res = pd.concat([original_dataframe, pd.get_dummies(original_dataframe[feature_to_encode],prefix=[feature_to_encode],dummy_na=True)], axis=1)
+    res = pd.concat([original_dataframe, pd.get_dummies(original_dataframe[feature_to_encode],prefix=feature_to_encode)], axis=1)
     res.drop(columns=[feature_to_encode],axis=1,inplace=True)
     return(res)
 
@@ -20,10 +20,12 @@ init_label_indx=random.sample(range(0,len(df)),200)
 init_labels=df[df.index.isin(init_label_indx)]
 remainder=df[~df.index.isin(init_label_indx)]
 assert len(init_labels)+len(remainder)==len(df),'the split did not work correctly'
-X=init_labels.iloc[:,:-1]
-y=init_labels.iloc[:,-1]
-X_test=remainder.iloc[:,:-1]
-y_test=remainder.iloc[:,-1]
+X=init_labels.drop('True Positive',axis=1)
+# print(X.columns)
+y=init_labels.loc[:,'True Positive']
+# print(y)
+X_test=remainder.drop('True Positive',axis=1)
+y_test=remainder.loc[:,'True Positive']
 lr=LogisticRegression(penalty='l1',solver='liblinear').fit(X,y)
 cdf = pd.DataFrame(lr.coef_.transpose(), X.columns, columns=['Coefficients'])
 print(cdf)

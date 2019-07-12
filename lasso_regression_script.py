@@ -4,7 +4,7 @@ from pandas import ExcelWriter,ExcelFile
 from sklearn.linear_model import LogisticRegressionCV
 
 def encode_and_bind(original_dataframe, feature_to_encode):
-    res = pd.concat([original_dataframe, pd.get_dummies(original_dataframe[feature_to_encode],prefix=feature_to_encode,dummy_na=True)], axis=1)
+    res = pd.concat([original_dataframe, pd.get_dummies(original_dataframe[feature_to_encode],prefix=feature_to_encode)], axis=1)
     res.drop(columns=[feature_to_encode],axis=1,inplace=True)
     return(res)
 
@@ -28,7 +28,7 @@ df=encode_and_bind(df,'Severity')
 df=encode_and_bind(df,'CWE')
 df = df[np.isfinite(df['True Positive'])]
 df = df[np.isfinite(df['True Positive'])]
-X=df.iloc[:,:-1]
-y=df.iloc[:,-1]
+X=df.drop('True Positive',axis=1)
+y=df.loc[:,'True Positive']
 clf=LogisticRegressionCV(cv=5,penalty='l1',solver='liblinear',scoring='accuracy').fit(X,y)
 print(clf.score(X,y))
