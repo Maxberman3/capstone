@@ -23,7 +23,7 @@ assert len(init_labels)+len(remainder)==len(df),'the split did not work correctl
 X=init_labels.drop('True Positive',axis=1)
 # print(X.columns)
 y=init_labels.loc[:,'True Positive']
-# print(y)
+# model.fit(X=X[label_ind.index, :], y=y[label_ind.index])print(y)
 X_test=remainder.drop('True Positive',axis=1)
 y_test=remainder.loc[:,'True Positive']
 lr=LogisticRegression(penalty='l1',solver='liblinear').fit(X,y)
