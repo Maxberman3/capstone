@@ -21,8 +21,12 @@ df.dropna(subset=['True Positive'],inplace=True)
 df=df.reindex()
 X=df.drop('True Positive',axis=1)
 y=df.loc[:,'True Positive']
-print(len(X))
-print(len(y))
+
+#change these parameters to alter experiment
+init_labels=0.005#initial label rate
+trn_tst_split=0.2# train test split portion
+stop=300#number of queries to execute
+
 alibox = ToolBox(X=X, y=y, query_type='AllLabels', saving_path='.')
 alibox.split_AL(test_ratio=0.2,initial_label_rate=0.005,split_count=3)
 # model=LogisticRegression(penalty='l1',solver='liblinear')
@@ -98,6 +102,6 @@ plt.xlim([0.0, 1.0])
 plt.ylim([0.0, 1.05])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('ROC at 300 Queries')
+plt.title('ROC at {} Queries'.format(str(stop)))
 plt.legend(loc="lower right")
 plt.show()

@@ -17,8 +17,14 @@ df=encode_and_bind(df,'CWE')
 df = df[np.isfinite(df['True Positive'])]
 X=df.drop('True Positive',axis=1)
 y=df.loc[:,'True Positive']
-al_unc=AlExperiment(X,y,model=LogisticRegression(penalty='l1',solver='liblinear'),performance_metric='accuracy_score',stopping_criteria='num_of_queries', stopping_value=300)
-al_unc.split_AL(test_ratio=0.2,initial_label_rate=0.005,split_count=5,all_class=True)
+#parameters for models defined here, simply change init_labels, trn_tst_split, splits to change experiment
+stop=300 #stopping value for number of queries
+init_labels=0.005 #initially labelled portion of the dataset
+trn_tst_split=0.2 #train test split to use for each fold
+splits=5 #number of k folds
+
+al_unc=AlExperiment(X,y,model=LogisticRegression(penalty='l1',solver='liblinear'),performance_metric='accuracy_score',stopping_criteria='num_of_queries', stopping_value=stop)
+al_unc.split_AL(test_ratio=trn_tst_split,initial_label_rate=init_labels,split_count=splits,all_class=True)
 al_unc.set_query_strategy(strategy='QueryInstanceUncertainty')
 al_unc.set_performance_metric(performance_metric='accuracy_score')
 al_unc.start_query(multi_thread=False)
@@ -26,14 +32,14 @@ al_unc.start_query(multi_thread=False)
 # al.plot_learning_curve()
 analyser=ExperimentAnalyser(x_axis='num_of_queries')
 analyser.add_method('uncertainty',al_unc.get_experiment_result())
-al_qbc=AlExperiment(X,y,model=LogisticRegression(penalty='l1',solver='liblinear'),performance_metric='accuracy_score',stopping_criteria='num_of_queries', stopping_value=300)
-al_qbc.split_AL(test_ratio=0.2,initial_label_rate=0.005,split_count=5,all_class=True)
+al_qbc=AlExperiment(X,y,model=LogisticRegression(penalty='l1',solver='liblinear'),performance_metric='accuracy_score',stopping_criteria='num_of_queries', stopping_value=stop)
+al_qbc.split_AL(test_ratio=trn_tst_split,initial_label_rate=init_labels,split_count=splits,all_class=True)
 al_qbc.set_query_strategy(strategy='QueryInstanceQBC')
 al_qbc.set_performance_metric(performance_metric='accuracy_score')
 al_qbc.start_query(multi_thread=False)
 analyser.add_method('by committee',al_qbc.get_experiment_result())
-al_rndm=AlExperiment(X,y,model=LogisticRegression(penalty='l1',solver='liblinear'),performance_metric='accuracy_score',stopping_criteria='num_of_queries', stopping_value=300)
-al_rndm.split_AL(test_ratio=0.2,initial_label_rate=0.005,split_count=5,all_class=True)
+al_rndm=AlExperiment(X,y,model=LogisticRegression(penalty='l1',solver='liblinear'),performance_metric='accuracy_score',stopping_criteria='num_of_queries', stopping_value=stop)
+al_rndm.split_AL(test_ratio=trn_tst_split,initial_label_rate=init_labels,split_count=splits,all_class=True)
 al_rndm.set_query_strategy(strategy='QueryRandom')
 al_rndm.set_performance_metric(performance_metric='accuracy_score')
 al_rndm.start_query(multi_thread=False)
