@@ -12,3 +12,5 @@ multi_thread_state.pkl
 test_idx.txt
 train_idx.txt
 unlabel_idx.txt
+ActiveLearning.png
+Up to speed on Active Learning.*
